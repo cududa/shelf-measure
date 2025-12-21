@@ -85,6 +85,12 @@
             },
             precision: 5,
             mmPerInch: 25.4,
+            layout: {
+                // Bracket placement along shelf depth
+                // mode: 'golden' uses golden ratio on the free space after subtracting bracket lengths
+                mode: 'golden',
+                phi: (1 + Math.sqrt(5)) / 2
+            },
             display: {
                 padding: 40,        // Canvas padding in pixels
                 minCanvasWidth: 600,
@@ -156,6 +162,52 @@
                     return `${inches.toFixed(CONFIG.precision)}" (${mm.toFixed(CONFIG.precision)} mm)`;
                 }
                 return `${inches.toFixed(CONFIG.precision)}"`;
+            }
+        };
+
+        // ============================================
+        // LAYOUT MODULE - Bracket placement helpers
+        // ============================================
+        const Layout = {
+            /**
+             * Compute symmetric inset from shelf edges to bracket edges (top/bottom), along shelf depth.
+             * Uses golden ratio on the *free* depth after subtracting the two bracket lengths:
+             *   depth = 2*inset + 2*L + gap
+             *   gap / (2*inset) = phi
+             * => inset = (depth - 2*L) / (2*(1+phi))
+             *
+             * Returns 0 when configuration or geometry makes the calculation invalid.
+             */
+            bracketInsetDepth() {
+                const depth = CONFIG.shelf.depth;
+                const L = CONFIG.bracket.length;
+                const phi = CONFIG.layout?.phi ?? ((1 + Math.sqrt(5)) / 2);
+
+                // If we're not in golden mode, default to 0 inset (flush)
+                if ((CONFIG.layout?.mode ?? 'golden') !== 'golden') return 0;
+
+                const free = depth - 2 * L;
+                if (free <= 0) return 0;
+
+                const inset = free / (2 * (1 + phi));
+
+                // Guard against weirdness
+                if (!Number.isFinite(inset) || inset < 0) return 0;
+
+                return inset;
+            },
+
+            /**
+             * Return the Y (in inches) for a bracket's top-left corner in TOP view.
+             * position: 'top' | 'bottom'
+             */
+            bracketYTopView(position) {
+                const inset = this.bracketInsetDepth();
+                const depth = CONFIG.shelf.depth;
+                const L = CONFIG.bracket.length;
+
+                if (position === 'top') return inset;
+                return depth - inset - L;
             }
         };
 
@@ -500,15 +552,9 @@
                 }
                 const bracketX = bracketCenterX - b.width / 2;
 
-                // Bracket is fully under the shelf, positioned at edge
-                let bracketY;
-                if (position === 'top') {
-                    // Top bracket: top edge aligns with shelf top edge
-                    bracketY = 0;
-                } else {
-                    // Bottom bracket: bottom edge aligns with shelf bottom edge
-                    bracketY = CONFIG.shelf.depth - b.length;
-                }
+                // Bracket is fully under the shelf, positioned along depth
+                // Default uses golden ratio inset (see Layout module)
+                const bracketY = Layout.bracketYTopView(position);
 
                 const x = this.toPixelX(bracketX);
                 const y = this.toPixelY(bracketY);
@@ -693,6 +739,10 @@
             console.log('Pipe diameter:', Units.formatInches(CONFIG.pipe.diameter, true));
             console.log('Pipe distance:', Units.formatInches(State.pipeDistance, true));
             console.log('Scale:', Renderer.scale.toFixed(2), 'pixels per inch');
+            const inset = Layout.bracketInsetDepth();
+            const gap = CONFIG.shelf.depth - 2 * inset - 2 * CONFIG.bracket.length;
+            console.log('Bracket inset (depth):', Units.formatInches(inset, true));
+            console.log('Bracket gap between (depth):', Units.formatInches(gap, true));
         }
 
         // Start the app when DOM is ready
