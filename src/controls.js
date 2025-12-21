@@ -4,12 +4,14 @@ import { Renderer } from './renderer.js';
 import { Layout } from './layout.js';
 import { Units } from './units.js';
 import { Template } from './template.js';
+import { exportTemplate, exportSVG } from './exporter.js';
 
 export const Controls = {
     init() {
         const pipeDistanceInput = document.getElementById('pipe-distance');
         const nutClearanceInput = document.getElementById('nut-clearance');
         const viewToggleBtn = document.getElementById('view-toggle');
+        const exportBtn = document.getElementById('export-template');
 
         pipeDistanceInput.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
@@ -76,6 +78,29 @@ export const Controls = {
                 templateContainer.style.display = 'none';
                 Renderer.calculateDimensions();
                 Renderer.render();
+            }
+        });
+
+        exportBtn.addEventListener('click', async () => {
+            if (State.view !== 'template') {
+                // ensure template view reflects latest numbers
+                Template.render();
+            }
+
+            // Add loading indicator
+            exportBtn.disabled = true;
+            const originalText = exportBtn.textContent;
+            exportBtn.textContent = 'Generating PDF...';
+
+            try {
+                await exportTemplate();
+            } catch (error) {
+                console.error('PDF export failed:', error);
+                alert('PDF export failed. Falling back to SVG export.');
+                exportSVG();
+            } finally {
+                exportBtn.disabled = false;
+                exportBtn.textContent = originalText;
             }
         });
     },

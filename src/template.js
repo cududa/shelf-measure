@@ -18,6 +18,7 @@ export const Template = {
         const shift = shiftInfo.shift;
         const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
         const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+        const bracketTopInset = Layout.bracketYTopView('top');
 
         // Key measurements
         const bracketEdgeFromShelfEdge = shift + b.width / 2 - shelfOverhang;
@@ -31,9 +32,9 @@ export const Template = {
 
         let svg = `<svg xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 ${pageWidthPx} ${pageHeightPx}"
-            width="612"
-            height="792"
-            style="background: white; max-width: 100%; height: auto;">
+            width="${pageWidthPx}pt"
+            height="${pageHeightPx}pt"
+            style="background: white;">
             <style>
                 .shelf-edge { stroke: #333; stroke-width: 1.5; stroke-dasharray: 7 4; }
                 .bracket { fill: none; stroke: #444; stroke-width: 1; }
@@ -44,20 +45,24 @@ export const Template = {
                 .dimension-text { font-family: sans-serif; font-size: 9px; fill: #333; }
                 .label { font-family: sans-serif; font-size: 11px; fill: #333; font-weight: bold; }
                 .info-text { font-family: sans-serif; font-size: 8px; fill: #555; }
-                .corner-mark { stroke: #000; stroke-width: 2; }
+                .corner-mark { stroke: #000; stroke-width: 3; }
             </style>`;
 
-        // Add 1" scale reference square (convert inches to pixels)
-        svg += this.drawScaleReference(0.5 * dpi, 0.5 * dpi, dpi);
+        // Add 1" scale reference square (convert inches to pixels) near top-left margin
+        svg += this.drawScaleReference(pageWidthPx - 1.8 * dpi, pageHeightPx - 1.8 * dpi, dpi);
 
         // Add title
         svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi}" class="label" text-anchor="middle" style="font-size: 14px;">Shelf Bracket Drilling Template</text>`;
 
-        // Left corner template - position at left side
-        svg += this.drawCornerTemplate(false, 2 * dpi, 1.2 * dpi, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, dpi);
+        const templateCenterX = pageWidthPx / 2;
+        const templateOffsetX = 3.2 * dpi;
+        const templateY = 1.6 * dpi;
 
-        // Right corner template - position at right side (mirrored)
-        svg += this.drawCornerTemplate(true, 6.5 * dpi, 1.2 * dpi, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, dpi);
+        // Left corner template (positioned symmetrically about center)
+        svg += this.drawCornerTemplate(false, templateCenterX - templateOffsetX, templateY, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, bracketTopInset, dpi);
+
+        // Right corner template
+        svg += this.drawCornerTemplate(true, templateCenterX + templateOffsetX, templateY, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, bracketTopInset, dpi);
 
         // Add measurements info at bottom
         svg += this.drawMeasurementsInfo(bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, dpi, pageWidthPx);
@@ -91,11 +96,14 @@ export const Template = {
      * @param {number} y - top Y position in pixels
      * @param {number} bracketEdge - distance from shelf edge to bracket outer edge (inches)
      * @param {number} innerHole - distance from shelf edge to inner hole center (inches)
+     * @param {number} bracketInset - distance from shelf top edge to bracket top (inches)
      * @param {number} dpi - Dots per inch for conversion
      */
-    drawCornerTemplate(isRight, x, y, bracketEdge, innerHole, dpi) {
+    drawCornerTemplate(isRight, x, y, bracketEdge, innerHole, bracketInset, dpi) {
         const b = CONFIG.bracket;
-        const cornerLength = 3.5 * dpi; // Length of corner reference lines in pixels
+        const interiorDir = isRight ? -1 : 1;
+        const boardHorizontalPreview = 3 * dpi;
+        const bracketInsetPx = bracketInset * dpi;
 
         // Convert bracket dimensions to pixels
         const bracketWidthPx = b.width * dpi;
@@ -104,23 +112,26 @@ export const Template = {
         const holeDiameterPx = b.holeDiameter * dpi;
         const bracketEdgePx = bracketEdge * dpi;
 
+        // Ensure the board preview extends past the bracket
+        const minBoardDepthPx = bracketInsetPx + bracketLengthPx + dpi * 0.5;
+        const boardVerticalPreview = Math.max(3 * dpi, minBoardDepthPx);
+
         let g = `<g id="${isRight ? 'right' : 'left'}-corner" transform="translate(${x}, ${y})">`;
 
         // Label
-        g += `<text x="0" y="-20" class="label" text-anchor="middle">${isRight ? 'RIGHT' : 'LEFT'} CORNER</text>`;
+        const labelAnchor = isRight ? 'end' : 'start';
+        const labelX = isRight ? -0.2 * dpi : 0.2 * dpi;
+        g += `<text x="${labelX}" y="-24" class="label" text-anchor="${labelAnchor}">${isRight ? 'RIGHT' : 'LEFT'} CORNER</text>`;
 
-        // Draw corner reference - the shelf edge
-        if (isRight) {
-            g += `<line x1="0" y1="0" x2="${-cornerLength}" y2="0" class="corner-mark"/>`;
-            g += `<line x1="0" y1="0" x2="0" y2="${cornerLength}" class="corner-mark"/>`;
-        } else {
-            g += `<line x1="0" y1="0" x2="${cornerLength}" y2="0" class="corner-mark"/>`;
-            g += `<line x1="0" y1="0" x2="0" y2="${cornerLength}" class="corner-mark"/>`;
-        }
+        // Draw board reference - the shelf edges extending a few inches
+        g += `<line x1="0" y1="0" x2="${interiorDir * boardHorizontalPreview}" y2="0" class="corner-mark"/>`;
+        g += `<line x1="0" y1="0" x2="0" y2="${boardVerticalPreview}" class="corner-mark"/>`;
 
         // Calculate bracket position in pixels
-        const bracketX = isRight ? -bracketEdgePx - bracketWidthPx : bracketEdgePx;
-        const bracketY = 0.5 * dpi; // Position bracket a bit down from top edge
+        const outerEdge = isRight ? bracketEdgePx : -bracketEdgePx;
+        const innerEdge = outerEdge + interiorDir * bracketWidthPx;
+        const bracketX = Math.min(outerEdge, innerEdge);
+        const bracketY = bracketInsetPx;
 
         // Draw bracket outline
         g += `<rect x="${bracketX}" y="${bracketY}" width="${bracketWidthPx}" height="${bracketLengthPx}" class="bracket"/>`;
@@ -138,12 +149,9 @@ export const Template = {
         });
 
         // Draw dimension line from shelf edge to bracket outer edge
-        const dimY = bracketY + bracketLengthPx + 20;
-        if (isRight) {
-            g += this.drawDimension(0, dimY, -bracketEdgePx, dimY, Units.formatWithFraction(bracketEdge), -12);
-        } else {
-            g += this.drawDimension(0, dimY, bracketEdgePx, dimY, Units.formatWithFraction(bracketEdge), -12);
-        }
+        const dimY = bracketY + bracketLengthPx + 35;
+        const dimensionEndX = isRight ? bracketEdgePx : -bracketEdgePx;
+        g += this.drawDimension(0, dimY, dimensionEndX, dimY, Units.formatWithFraction(bracketEdge), 14);
 
         g += '</g>';
         return g;
@@ -225,4 +233,3 @@ export const Template = {
         container.innerHTML = this.generateSVG();
     }
 };
-

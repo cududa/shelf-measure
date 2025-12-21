@@ -4,6 +4,7 @@ import { Units } from './units.js';
 import { CONFIG } from './config.js';
 import { Layout } from './layout.js';
 import { State } from './state.js';
+import { Template } from './template.js';
 
 export function init() {
     Renderer.init();
@@ -15,6 +16,25 @@ export function init() {
     window.addEventListener('resize', () => {
         Renderer.calculateDimensions();
         Renderer.render();
+    });
+
+    window.addEventListener('beforeprint', () => {
+        // Always render fresh template before printing
+        Template.render();
+        // Ensure template container is visible
+        const templateContainer = document.getElementById('template-container');
+        templateContainer.style.display = 'block';
+    });
+
+    window.addEventListener('afterprint', () => {
+        // Restore visibility based on current view
+        const templateContainer = document.getElementById('template-container');
+        const canvasContainer = document.getElementById('canvas-container');
+
+        if (State.view !== 'template') {
+            templateContainer.style.display = 'none';
+            canvasContainer.style.display = 'block';
+        }
     });
 
     // Log dimensions for verification
@@ -39,4 +59,3 @@ export function init() {
         console.warn(`Need ${Units.toMm(shiftInfo.minShift).toFixed(2)}mm, max allowed ${Units.toMm(shiftInfo.maxShift).toFixed(2)}mm`);
     }
 }
-
