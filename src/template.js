@@ -1,0 +1,228 @@
+import { CONFIG } from './config.js';
+import { State } from './state.js';
+import { Layout } from './layout.js';
+import { Units } from './units.js';
+
+export const Template = {
+    // Letter paper dimensions in inches
+    pageWidth: 8.5,
+    pageHeight: 11,
+
+    /**
+     * Generate the complete SVG template
+     * @returns {string} SVG markup
+     */
+    generateSVG() {
+        const b = CONFIG.bracket;
+        const shiftInfo = Layout.optimalShift();
+        const shift = shiftInfo.shift;
+        const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
+        const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+
+        // Key measurements
+        const bracketEdgeFromShelfEdge = shift + b.width / 2 - shelfOverhang;
+        const innerHoleFromShelfEdge = shelfOverhang - shift + holeCenterFromBracketCenter;
+
+        // Use 72 DPI for coordinate system (standard print DPI)
+        // This gives us 612 x 792 pixels for 8.5" x 11"
+        const dpi = 72;
+        const pageWidthPx = this.pageWidth * dpi;
+        const pageHeightPx = this.pageHeight * dpi;
+
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 ${pageWidthPx} ${pageHeightPx}"
+            width="612"
+            height="792"
+            style="background: white; max-width: 100%; height: auto;">
+            <style>
+                .shelf-edge { stroke: #333; stroke-width: 1.5; stroke-dasharray: 7 4; }
+                .bracket { fill: none; stroke: #444; stroke-width: 1; }
+                .drill-hole { fill: none; stroke: #000; stroke-width: 1.5; }
+                .crosshair { stroke: #000; stroke-width: 0.75; }
+                .scale-box { fill: none; stroke: #000; stroke-width: 1.5; }
+                .dimension-line { stroke: #666; stroke-width: 0.75; }
+                .dimension-text { font-family: sans-serif; font-size: 9px; fill: #333; }
+                .label { font-family: sans-serif; font-size: 11px; fill: #333; font-weight: bold; }
+                .info-text { font-family: sans-serif; font-size: 8px; fill: #555; }
+                .corner-mark { stroke: #000; stroke-width: 2; }
+            </style>`;
+
+        // Add 1" scale reference square (convert inches to pixels)
+        svg += this.drawScaleReference(0.5 * dpi, 0.5 * dpi, dpi);
+
+        // Add title
+        svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi}" class="label" text-anchor="middle" style="font-size: 14px;">Shelf Bracket Drilling Template</text>`;
+
+        // Left corner template - position at left side
+        svg += this.drawCornerTemplate(false, 2 * dpi, 1.2 * dpi, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, dpi);
+
+        // Right corner template - position at right side (mirrored)
+        svg += this.drawCornerTemplate(true, 6.5 * dpi, 1.2 * dpi, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, dpi);
+
+        // Add measurements info at bottom
+        svg += this.drawMeasurementsInfo(bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, dpi, pageWidthPx);
+
+        // Add usage instructions
+        svg += this.drawInstructions(dpi, pageWidthPx);
+
+        svg += '</svg>';
+        return svg;
+    },
+
+    /**
+     * Draw 1" x 1" scale reference square
+     * @param {number} x - X position in pixels
+     * @param {number} y - Y position in pixels
+     * @param {number} dpi - Dots per inch for conversion
+     */
+    drawScaleReference(x, y, dpi) {
+        const size = 1 * dpi; // 1 inch in pixels
+        return `
+            <g id="scale-reference">
+                <rect x="${x}" y="${y}" width="${size}" height="${size}" class="scale-box"/>
+                <text x="${x + size/2}" y="${y + size + 12}" class="info-text" text-anchor="middle">1" x 1" (verify scale)</text>
+            </g>`;
+    },
+
+    /**
+     * Draw a corner template (shelf corner + bracket + holes)
+     * @param {boolean} isRight - true for right corner (mirrored)
+     * @param {number} x - center X position in pixels
+     * @param {number} y - top Y position in pixels
+     * @param {number} bracketEdge - distance from shelf edge to bracket outer edge (inches)
+     * @param {number} innerHole - distance from shelf edge to inner hole center (inches)
+     * @param {number} dpi - Dots per inch for conversion
+     */
+    drawCornerTemplate(isRight, x, y, bracketEdge, innerHole, dpi) {
+        const b = CONFIG.bracket;
+        const cornerLength = 3.5 * dpi; // Length of corner reference lines in pixels
+
+        // Convert bracket dimensions to pixels
+        const bracketWidthPx = b.width * dpi;
+        const bracketLengthPx = b.length * dpi;
+        const holeCenterPx = b.holeCenter * dpi;
+        const holeDiameterPx = b.holeDiameter * dpi;
+        const bracketEdgePx = bracketEdge * dpi;
+
+        let g = `<g id="${isRight ? 'right' : 'left'}-corner" transform="translate(${x}, ${y})">`;
+
+        // Label
+        g += `<text x="0" y="-20" class="label" text-anchor="middle">${isRight ? 'RIGHT' : 'LEFT'} CORNER</text>`;
+
+        // Draw corner reference - the shelf edge
+        if (isRight) {
+            g += `<line x1="0" y1="0" x2="${-cornerLength}" y2="0" class="corner-mark"/>`;
+            g += `<line x1="0" y1="0" x2="0" y2="${cornerLength}" class="corner-mark"/>`;
+        } else {
+            g += `<line x1="0" y1="0" x2="${cornerLength}" y2="0" class="corner-mark"/>`;
+            g += `<line x1="0" y1="0" x2="0" y2="${cornerLength}" class="corner-mark"/>`;
+        }
+
+        // Calculate bracket position in pixels
+        const bracketX = isRight ? -bracketEdgePx - bracketWidthPx : bracketEdgePx;
+        const bracketY = 0.5 * dpi; // Position bracket a bit down from top edge
+
+        // Draw bracket outline
+        g += `<rect x="${bracketX}" y="${bracketY}" width="${bracketWidthPx}" height="${bracketLengthPx}" class="bracket"/>`;
+
+        // Draw the 4 drill holes with crosshairs
+        const holes = [
+            { x: bracketX + holeCenterPx, y: bracketY + holeCenterPx },
+            { x: bracketX + bracketWidthPx - holeCenterPx, y: bracketY + holeCenterPx },
+            { x: bracketX + holeCenterPx, y: bracketY + bracketLengthPx - holeCenterPx },
+            { x: bracketX + bracketWidthPx - holeCenterPx, y: bracketY + bracketLengthPx - holeCenterPx }
+        ];
+
+        holes.forEach((hole) => {
+            g += this.drawHole(hole.x, hole.y, holeDiameterPx);
+        });
+
+        // Draw dimension line from shelf edge to bracket outer edge
+        const dimY = bracketY + bracketLengthPx + 20;
+        if (isRight) {
+            g += this.drawDimension(0, dimY, -bracketEdgePx, dimY, Units.formatWithFraction(bracketEdge), -12);
+        } else {
+            g += this.drawDimension(0, dimY, bracketEdgePx, dimY, Units.formatWithFraction(bracketEdge), -12);
+        }
+
+        g += '</g>';
+        return g;
+    },
+
+    /**
+     * Draw a drill hole with crosshairs
+     * @param {number} cx - Center X in pixels
+     * @param {number} cy - Center Y in pixels
+     * @param {number} diameter - Hole diameter in pixels
+     */
+    drawHole(cx, cy, diameter) {
+        const r = diameter / 2;
+        const crossLen = r + 6; // Crosshairs extend 6px beyond hole
+
+        return `
+            <circle cx="${cx}" cy="${cy}" r="${r}" class="drill-hole"/>
+            <line x1="${cx - crossLen}" y1="${cy}" x2="${cx + crossLen}" y2="${cy}" class="crosshair"/>
+            <line x1="${cx}" y1="${cy - crossLen}" x2="${cx}" y2="${cy + crossLen}" class="crosshair"/>`;
+    },
+
+    /**
+     * Draw a dimension line with label
+     * All coordinates in pixels
+     */
+    drawDimension(x1, y1, x2, y2, label, textOffset) {
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+
+        return `
+            <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="dimension-line"/>
+            <line x1="${x1}" y1="${y1 - 4}" x2="${x1}" y2="${y1 + 4}" class="dimension-line"/>
+            <line x1="${x2}" y1="${y2 - 4}" x2="${x2}" y2="${y2 + 4}" class="dimension-line"/>
+            <text x="${midX}" y="${midY + textOffset}" class="dimension-text" text-anchor="middle">${label}</text>`;
+    },
+
+    /**
+     * Draw measurements info section
+     * @param {number} bracketEdge - Bracket edge distance in inches
+     * @param {number} innerHole - Inner hole distance in inches
+     * @param {number} dpi - Dots per inch
+     * @param {number} pageWidthPx - Page width in pixels
+     */
+    drawMeasurementsInfo(bracketEdge, innerHole, dpi, pageWidthPx) {
+        const y = 7.5 * dpi;
+        const centerX = pageWidthPx / 2;
+        return `
+            <g id="measurements">
+                <text x="${centerX}" y="${y}" class="label" text-anchor="middle">Key Measurements</text>
+                <text x="${centerX}" y="${y + 18}" class="info-text" text-anchor="middle">Bracket outer edge from shelf edge: ${Units.formatWithFraction(bracketEdge)}</text>
+                <text x="${centerX}" y="${y + 32}" class="info-text" text-anchor="middle">Inner drill hole from shelf edge: ${Units.formatWithFraction(innerHole)}</text>
+                <text x="${centerX}" y="${y + 46}" class="info-text" text-anchor="middle">Pipe Distance: ${State.pipeDistance.toFixed(5)}" | Nut-Pipe Gap: ${(State.nutPipeClearance * 25.4).toFixed(2)}mm</text>
+            </g>`;
+    },
+
+    /**
+     * Draw usage instructions
+     * @param {number} dpi - Dots per inch
+     * @param {number} pageWidthPx - Page width in pixels
+     */
+    drawInstructions(dpi, pageWidthPx) {
+        const y = 8.8 * dpi;
+        const centerX = pageWidthPx / 2;
+        return `
+            <g id="instructions">
+                <text x="${centerX}" y="${y}" class="label" text-anchor="middle">Instructions</text>
+                <text x="${centerX}" y="${y + 16}" class="info-text" text-anchor="middle">1. Print at 100% scale (no fit-to-page) - measure the 1" square to verify</text>
+                <text x="${centerX}" y="${y + 30}" class="info-text" text-anchor="middle">2. Align corner mark with shelf corner, use LEFT for left corners, RIGHT for right corners</text>
+                <text x="${centerX}" y="${y + 44}" class="info-text" text-anchor="middle">3. Mark drill hole centers through the crosshairs</text>
+                <text x="${centerX}" y="${y + 58}" class="info-text" text-anchor="middle">4. Flip paper 180° to mark bottom corners (same left/right orientation)</text>
+            </g>`;
+    },
+
+    /**
+     * Render the template to the container
+     */
+    render() {
+        const container = document.getElementById('template-container');
+        container.innerHTML = this.generateSVG();
+    }
+};
+
