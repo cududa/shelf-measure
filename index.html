@@ -49,6 +49,11 @@
     </style>
 </head>
 <body>
+    <div id="placement-info" style="margin-bottom: 10px; font-size: 13px; color: #333; background: #e8f5e9; padding: 8px 12px; border-radius: 4px; display: inline-block;">
+        <strong>Placement Guide:</strong>
+        <span id="bracket-edge-distance" style="margin-left: 10px;">Bracket outer edge from shelf edge: --</span>
+        <span id="drill-hole-distance" style="margin-left: 15px;">Inner drill hole center from shelf edge: --</span>
+    </div>
     <div id="canvas-container">
         <canvas id="shelf-canvas"></canvas>
     </div>
@@ -56,6 +61,9 @@
         <label for="pipe-distance">Pipe Distance:</label>
         <input type="number" id="pipe-distance" step="0.00001" value="28.96875">
         <span>inches</span>
+        <label for="nut-clearance" style="margin-left: 20px;">Nut-Pipe Gap:</label>
+        <input type="number" id="nut-clearance" step="0.1" value="1.25" style="width: 60px;">
+        <span>mm</span>
         <button id="view-toggle" style="margin-left: 20px; padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer;">View: Top</button>
     </div>
     <div id="clearance-info" style="margin-top: 10px; font-size: 12px; display: flex; gap: 20px;">
@@ -142,7 +150,8 @@
         const State = {
             pipeDistance: 28.96875,  // Distance between inner edges of pipes
             shelfOpacity: 1.0,       // 1.0 or 0.5
-            view: 'top'              // 'top' or 'front'
+            view: 'top',             // 'top' or 'front'
+            nutPipeClearance: 1.25 / 25.4  // Target nut-to-pipe gap in inches (default 1.25mm)
         };
 
         // ============================================
@@ -190,6 +199,65 @@
                     return `${inches.toFixed(CONFIG.precision)}" (${mm.toFixed(CONFIG.precision)} mm)`;
                 }
                 return `${inches.toFixed(CONFIG.precision)}"`;
+            },
+
+            /**
+             * Convert decimal inches to nearest fraction (up to 32nds)
+             * @param {number} inches - decimal inches
+             * @returns {string} - fractional representation like "1/2" or "5/16" or "3" for whole numbers
+             */
+            toFraction(inches) {
+                const maxDenom = 32;
+                const sign = inches < 0 ? '-' : '';
+                const absInches = Math.abs(inches);
+                const whole = Math.floor(absInches);
+                const decimal = absInches - whole;
+
+                // Find nearest fraction
+                let bestNumer = 0;
+                let bestDenom = 1;
+                let bestError = decimal;
+
+                for (let denom = 1; denom <= maxDenom; denom *= 2) {
+                    const numer = Math.round(decimal * denom);
+                    const error = Math.abs(decimal - numer / denom);
+                    if (error < bestError) {
+                        bestError = error;
+                        bestNumer = numer;
+                        bestDenom = denom;
+                    }
+                }
+
+                // Reduce fraction
+                const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+                if (bestNumer > 0) {
+                    const divisor = gcd(bestNumer, bestDenom);
+                    bestNumer /= divisor;
+                    bestDenom /= divisor;
+                }
+
+                // Format result
+                if (bestNumer === 0 || bestNumer === bestDenom) {
+                    // Whole number or rounds to next whole
+                    const wholeResult = bestNumer === bestDenom ? whole + 1 : whole;
+                    return sign + wholeResult + '"';
+                } else if (whole === 0) {
+                    return sign + bestNumer + '/' + bestDenom + '"';
+                } else {
+                    return sign + whole + '-' + bestNumer + '/' + bestDenom + '"';
+                }
+            },
+
+            /**
+             * Format inches with both precise decimal and fractional approximation
+             * @param {number} inches
+             * @returns {string}
+             */
+            formatWithFraction(inches) {
+                const precise = inches.toFixed(4) + '"';
+                const fraction = this.toFraction(inches);
+                const mm = this.toMm(inches).toFixed(2) + 'mm';
+                return `${precise} (${fraction}, ${mm})`;
             }
         };
 
@@ -280,7 +348,7 @@
                 // -shift <= -pipeRadius + holeCenterFromBracketCenter - nutInnerRadius
                 // shift >= pipeRadius - holeCenterFromBracketCenter + nutInnerRadius
 
-                return pipeRadius - holeCenterFromBracketCenter + nutInnerRadius + hw.nutPipeClearance.target;
+                return pipeRadius - holeCenterFromBracketCenter + nutInnerRadius + State.nutPipeClearance;
             },
 
             /**
@@ -338,7 +406,7 @@
                 return {
                     clearance: Math.abs(clearance),
                     isOk: (isLeft ? nutInnerEdgeX <= pipeOuterEdge : nutInnerEdgeX >= pipeOuterEdge),
-                    required: hw.nutPipeClearance.target
+                    required: State.nutPipeClearance
                 };
             },
 
@@ -1052,6 +1120,7 @@
         const Controls = {
             init() {
                 const pipeDistanceInput = document.getElementById('pipe-distance');
+                const nutClearanceInput = document.getElementById('nut-clearance');
                 const viewToggleBtn = document.getElementById('view-toggle');
 
                 pipeDistanceInput.addEventListener('input', (e) => {
@@ -1061,6 +1130,26 @@
                         Renderer.calculateDimensions();
                         Renderer.render();
                         this.updateClearanceDisplay();
+                    }
+                });
+
+                nutClearanceInput.addEventListener('input', (e) => {
+                    const valueMm = parseFloat(e.target.value);
+                    if (!isNaN(valueMm) && valueMm >= 0) {
+                        State.nutPipeClearance = valueMm / 25.4;  // Convert mm to inches
+                        Renderer.render();
+                        this.updateClearanceDisplay();
+
+                        // Warn if gap is too small (< 1.0mm recommended minimum)
+                        if (valueMm < 1.0) {
+                            nutClearanceInput.style.borderColor = '#c62828';
+                            nutClearanceInput.style.backgroundColor = '#ffebee';
+                            nutClearanceInput.title = 'Warning: Gap below 1.0mm recommended minimum';
+                        } else {
+                            nutClearanceInput.style.borderColor = '';
+                            nutClearanceInput.style.backgroundColor = '';
+                            nutClearanceInput.title = '';
+                        }
                     }
                 });
 
@@ -1099,6 +1188,38 @@
                     rightEl.textContent = leftClearance.isOk ? 'Nut clearance: OK' : 'Nut clearance: Check';
                     rightEl.style.color = leftClearance.isOk ? '#2e7d32' : '#ff9800';
                 }
+
+                // Update placement guide
+                this.updatePlacementGuide(shiftInfo.shift);
+            },
+
+            /**
+             * Update the placement guide display with practical measurements
+             */
+            updatePlacementGuide(shift) {
+                const b = CONFIG.bracket;
+                const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
+                const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+
+                // Distance from shelf edge to bracket outer edge
+                // Bracket outer edge (for left bracket) is at: -shift - b.width/2
+                // Shelf edge is at: -shelfOverhang
+                // Distance = shelfEdge - bracketOuterEdge = -shelfOverhang - (-shift - b.width/2)
+                //          = -shelfOverhang + shift + b.width/2 = shift + b.width/2 - shelfOverhang
+                const bracketEdgeFromShelfEdge = shift + b.width / 2 - shelfOverhang;
+
+                // Distance from shelf edge to inner drill hole center
+                // Inner hole (for left bracket) is at: -shift + holeCenterFromBracketCenter
+                // Distance = shelfEdge - innerHoleX = -shelfOverhang - (-shift + holeCenterFromBracketCenter)
+                //          = -shelfOverhang + shift - holeCenterFromBracketCenter
+                // But we want positive "inward" distance, so:
+                const innerHoleFromShelfEdge = shelfOverhang - shift + holeCenterFromBracketCenter;
+
+                const bracketEdgeEl = document.getElementById('bracket-edge-distance');
+                const drillHoleEl = document.getElementById('drill-hole-distance');
+
+                bracketEdgeEl.textContent = `Bracket outer edge from shelf edge: ${Units.formatWithFraction(bracketEdgeFromShelfEdge)}`;
+                drillHoleEl.textContent = `Inner drill hole from edge: ${Units.formatWithFraction(innerHoleFromShelfEdge)}`;
             }
         };
 
