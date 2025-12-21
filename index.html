@@ -80,7 +80,8 @@
                 length: 60 / 25.4,          // 60mm = 2.3622" (along pipe)
                 thickness: 1.5 / 25.4,      // 1.5mm = 0.05906"
                 holeCenter: 8 / 25.4,       // 8mm from edge to hole center = 0.31496"
-                holeDiameter: 4.5 / 25.4    // 4.5mm = 0.17717"
+                holeDiameter: 4.5 / 25.4,   // 4.5mm = 0.17717"
+                holeClearance: 1 / 16       // Keep holes this far inside/outside shelf edges
             },
             precision: 5,
             mmPerInch: 25.4,
@@ -223,7 +224,6 @@
              */
             calculateDimensions() {
                 const pipeRadius = CONFIG.pipe.diameter / 2;
-                const bracketExtension = CONFIG.bracket.length / 2;  // How much bracket extends past shelf
 
                 // Total width = pipe distance + full diameter on each side (for the pipes extending outside)
                 const totalWidth = State.pipeDistance + CONFIG.pipe.diameter;
@@ -231,8 +231,8 @@
                 // Total height depends on view
                 let totalHeight;
                 if (State.view === 'top') {
-                    // Need to fit: pipe overhang at top + shelf depth + bracket extension at bottom
-                    totalHeight = CONFIG.pipe.overhang + CONFIG.shelf.depth + bracketExtension;
+                    // Brackets are now fully under the shelf, so just pipe length
+                    totalHeight = CONFIG.pipe.length;
                 } else {
                     // Front view: bracket thickness + pipe diameter + shelf height
                     totalHeight = CONFIG.bracket.thickness + CONFIG.pipe.diameter + CONFIG.shelf.height;
@@ -460,7 +460,12 @@
                 // Apply opacity
                 ctx.globalAlpha = State.shelfOpacity;
                 this.fillRect(x, y, width, height, CONFIG.colors.shelf);
-                this.strokeRect(x, y, width, height, CONFIG.colors.shelfStroke, 2);
+                // Draw stroke INSIDE the shelf bounds (inset by half stroke width)
+                const strokeWidth = 2;
+                const inset = strokeWidth / 2;
+                ctx.strokeStyle = CONFIG.colors.shelfStroke;
+                ctx.lineWidth = strokeWidth;
+                ctx.strokeRect(x + inset, y + inset, width - strokeWidth, height - strokeWidth);
                 ctx.globalAlpha = 1.0;
             },
 
@@ -469,19 +474,41 @@
             /**
              * Draw a bracket in top view (rectangle with 4 holes)
              * @param {number} xPipeInnerEdge - X position of the pipe's inner edge in inches
-             * @param {boolean} isLeft - true for left bracket, false for right
+             * @param {string} position - 'top' or 'bottom' edge of shelf
+             * @param {boolean} isLeft - true for left pipe brackets, false for right
              */
-            drawBracketTop(xPipeInnerEdge, isLeft) {
+            drawBracketTop(xPipeInnerEdge, position, isLeft) {
                 const ctx = this.ctx;
                 const b = CONFIG.bracket;
 
-                // Bracket is centered on pipe (x-axis) and straddles shelf bottom edge (y-axis)
-                // The bracket's center aligns with the pipe center (inner edge)
-                const bracketCenterX = xPipeInnerEdge;
-                const bracketCenterY = CONFIG.shelf.depth;  // Bottom edge of shelf
+                // Calculate shelf overhang (how much shelf extends past pipe inner edge)
+                const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
 
+                // Distance from bracket center to hole column
+                const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+
+                // Shift bracket so outer holes FULLY clear the shelf edge
+                // Need to account for hole radius + clearance so the entire hole is outside
+                const holeRadius = b.holeDiameter / 2;
+                const shift = shelfOverhang - holeCenterFromBracketCenter + holeRadius + b.holeClearance;
+
+                let bracketCenterX;
+                if (isLeft) {
+                    bracketCenterX = xPipeInnerEdge - shift;  // Shift left
+                } else {
+                    bracketCenterX = xPipeInnerEdge + shift;  // Shift right
+                }
                 const bracketX = bracketCenterX - b.width / 2;
-                const bracketY = bracketCenterY - b.length / 2;
+
+                // Bracket is fully under the shelf, positioned at edge
+                let bracketY;
+                if (position === 'top') {
+                    // Top bracket: top edge aligns with shelf top edge
+                    bracketY = 0;
+                } else {
+                    // Bottom bracket: bottom edge aligns with shelf bottom edge
+                    bracketY = CONFIG.shelf.depth - b.length;
+                }
 
                 const x = this.toPixelX(bracketX);
                 const y = this.toPixelY(bracketY);
@@ -494,7 +521,7 @@
 
                 // Draw 4 holes (2x2 pattern)
                 // Holes are 8mm from each edge
-                const holeRadius = this.toPixels(b.holeDiameter / 2);
+                const holeRadiusPixels = this.toPixels(b.holeDiameter / 2);
                 const holeOffsetX = b.holeCenter;  // From bracket edge
                 const holeOffsetY = b.holeCenter;  // From bracket edge
 
@@ -509,29 +536,44 @@
                 ctx.fillStyle = CONFIG.colors.bracketHole;
                 holes.forEach(hole => {
                     ctx.beginPath();
-                    ctx.arc(this.toPixelX(hole.x), this.toPixelY(hole.y), holeRadius, 0, Math.PI * 2);
+                    ctx.arc(this.toPixelX(hole.x), this.toPixelY(hole.y), holeRadiusPixels, 0, Math.PI * 2);
                     ctx.fill();
                 });
             },
 
             /**
-             * Draw both brackets in top view
+             * Draw all 4 brackets in top view (2 per pipe)
              */
             drawBracketsTop() {
-                this.drawBracketTop(0, true);                    // Left bracket
-                this.drawBracketTop(State.pipeDistance, false); // Right bracket
+                // Left pipe brackets
+                this.drawBracketTop(0, 'top', true);
+                this.drawBracketTop(0, 'bottom', true);
+                // Right pipe brackets
+                this.drawBracketTop(State.pipeDistance, 'top', false);
+                this.drawBracketTop(State.pipeDistance, 'bottom', false);
             },
 
             /**
              * Draw a bracket in front view (thin rectangle on top of pipe)
              * @param {number} xPipeInnerEdge - X position of the pipe's inner edge in inches
+             * @param {boolean} isLeft - true for left pipe bracket, false for right
              */
-            drawBracketFront(xPipeInnerEdge) {
+            drawBracketFront(xPipeInnerEdge, isLeft) {
                 const ctx = this.ctx;
                 const b = CONFIG.bracket;
 
-                // Bracket sits on top of the pipe circle
-                const bracketCenterX = xPipeInnerEdge;
+                // Calculate shift (same as top view)
+                const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
+                const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+                const holeRadius = b.holeDiameter / 2;
+                const shift = shelfOverhang - holeCenterFromBracketCenter + holeRadius + b.holeClearance;
+
+                let bracketCenterX;
+                if (isLeft) {
+                    bracketCenterX = xPipeInnerEdge - shift;
+                } else {
+                    bracketCenterX = xPipeInnerEdge + shift;
+                }
                 const bracketX = bracketCenterX - b.width / 2;
 
                 const x = this.toPixelX(bracketX);
@@ -547,8 +589,8 @@
              * Draw both brackets in front view
              */
             drawBracketsFront() {
-                this.drawBracketFront(0);
-                this.drawBracketFront(State.pipeDistance);
+                this.drawBracketFront(0, true);
+                this.drawBracketFront(State.pipeDistance, false);
             },
 
             /**
@@ -575,7 +617,12 @@
                 // Apply opacity
                 ctx.globalAlpha = State.shelfOpacity;
                 this.fillRect(x, y, width, height, CONFIG.colors.shelf);
-                this.strokeRect(x, y, width, height, CONFIG.colors.shelfStroke, 2);
+                // Draw stroke INSIDE the shelf bounds (inset by half stroke width)
+                const strokeWidth = 2;
+                const inset = strokeWidth / 2;
+                ctx.strokeStyle = CONFIG.colors.shelfStroke;
+                ctx.lineWidth = strokeWidth;
+                ctx.strokeRect(x + inset, y + inset, width - strokeWidth, height - strokeWidth);
                 ctx.globalAlpha = 1.0;
             },
 
