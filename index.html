@@ -58,6 +58,10 @@
         <span>inches</span>
         <button id="view-toggle" style="margin-left: 20px; padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer;">View: Top</button>
     </div>
+    <div id="clearance-info" style="margin-top: 10px; font-size: 12px; display: flex; gap: 20px;">
+        <span id="clearance-left">Nut clearance (L): --</span>
+        <span id="clearance-right">Nut clearance (R): --</span>
+    </div>
 
     <script>
         // ============================================
@@ -83,6 +87,24 @@
                 holeDiameter: 4.5 / 25.4,   // 4.5mm = 0.17717"
                 holeClearance: 1 / 16       // Keep holes this far inside/outside shelf edges
             },
+            hardware: {
+                // M4-0.7 x 8mm ISO 7380 Button Head Cap Screw
+                buttonScrew: {
+                    headDiameter: 7.6 / 25.4,    // 7.6mm typical for M4 button head
+                    headHeight: 2.2 / 25.4       // 2.2mm typical height
+                },
+                // M4 Brass Hex Cap Nut
+                hexCapNut: {
+                    acrossFlats: 4.9 / 25.4,     // 4.9mm AF
+                    acrossCorners: 7.9 / 25.4,   // 7.9mm AC (corner-to-corner)
+                    height: 9.3 / 25.4           // 9.3mm total height
+                },
+                // Clearance requirements
+                nutPipeClearance: {
+                    target: 1.25 / 25.4,         // Target gap: 1.25mm (middle of 1.0-1.5 range)
+                    minimum: 1.0 / 25.4          // Minimum acceptable: 1.0mm
+                }
+            },
             precision: 5,
             mmPerInch: 25.4,
             layout: {
@@ -104,7 +126,13 @@
                 bracket: '#2d2d2d',
                 bracketStroke: '#1a1a1a',
                 bracketHole: '#ffffff',
-                background: '#ffffff'
+                background: '#ffffff',
+                // Hardware colors
+                buttonScrewHead: '#4a4a4a',
+                buttonScrewHeadStroke: '#2d2d2d',
+                buttonScrewSocket: '#1a1a1a',
+                hexNut: '#b8860b',           // Brass color
+                hexNutStroke: '#8b6914'
             }
         };
 
@@ -208,6 +236,142 @@
 
                 if (position === 'top') return inset;
                 return depth - inset - L;
+            },
+
+            /**
+             * Calculate the minimum bracket shift needed for button head to clear shelf edge.
+             * @returns {number} minimum shift in inches
+             */
+            minShiftForButtonHeadClearance() {
+                const b = CONFIG.bracket;
+                const hw = CONFIG.hardware;
+                const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
+                const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+                const buttonHeadRadius = hw.buttonScrew.headDiameter / 2;
+
+                // For left bracket:
+                // outerHoleX = -shift - holeCenterFromBracketCenter
+                // Button head outer edge = outerHoleX + buttonHeadRadius
+                // Must be outside shelf: outerHoleX + buttonHeadRadius < -shelfOverhang
+                // -shift - holeCenterFromBracketCenter + buttonHeadRadius < -shelfOverhang
+                // -shift < -shelfOverhang + holeCenterFromBracketCenter - buttonHeadRadius
+                // shift > shelfOverhang - holeCenterFromBracketCenter + buttonHeadRadius
+
+                return shelfOverhang - holeCenterFromBracketCenter + buttonHeadRadius + b.holeClearance;
+            },
+
+            /**
+             * Calculate the minimum bracket shift needed for nut to clear pipe horizontally.
+             * The nut's inner edge (closest to pipe) must be outside the pipe's radius.
+             * @returns {number} minimum shift in inches
+             */
+            minShiftForNutClearance() {
+                const hw = CONFIG.hardware;
+                const pipeRadius = CONFIG.pipe.diameter / 2;
+                const holeCenterFromBracketCenter = CONFIG.bracket.width / 2 - CONFIG.bracket.holeCenter;
+                // Use across-flats/2 for the inner edge of the nut (flat facing pipe is best case)
+                const nutInnerRadius = hw.hexCapNut.acrossFlats / 2;
+
+                // For left bracket:
+                // outerHoleX = -shift - holeCenterFromBracketCenter
+                // Nut inner edge = outerHoleX + nutInnerRadius (closer to center)
+                // Must be outside pipe: nutInnerEdge <= -pipeRadius
+                // -shift - holeCenterFromBracketCenter + nutInnerRadius <= -pipeRadius
+                // -shift <= -pipeRadius + holeCenterFromBracketCenter - nutInnerRadius
+                // shift >= pipeRadius - holeCenterFromBracketCenter + nutInnerRadius
+
+                return pipeRadius - holeCenterFromBracketCenter + nutInnerRadius + hw.nutPipeClearance.target;
+            },
+
+            /**
+             * Calculate the maximum bracket shift allowed so inner holes stay over the wood.
+             * Inner holes must not extend past the pipe center line (x=0 for left pipe).
+             * @returns {number} maximum shift in inches
+             */
+            maxShiftForInnerHoles() {
+                const holeCenterFromBracketCenter = CONFIG.bracket.width / 2 - CONFIG.bracket.holeCenter;
+
+                // For left bracket:
+                // innerHoleX = -shift + holeCenterFromBracketCenter
+                // Must stay right of pipe center (x=0): innerHoleX >= 0
+                // -shift + holeCenterFromBracketCenter >= 0
+                // shift <= holeCenterFromBracketCenter
+
+                return holeCenterFromBracketCenter;
+            },
+
+            /**
+             * Calculate actual nut-to-pipe clearance for current bracket position
+             * @param {boolean} isLeft - true for left bracket
+             * @param {number} shift - the bracket shift value being used
+             * @returns {object} { clearance, isOk, required }
+             */
+            nutToPipeClearance(isLeft, shift) {
+                const hw = CONFIG.hardware;
+                const b = CONFIG.bracket;
+                const pipeRadius = CONFIG.pipe.diameter / 2;
+                const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+                const nutInnerRadius = hw.hexCapNut.acrossFlats / 2;
+
+                // Calculate outer hole position
+                const pipeCenter = isLeft ? 0 : State.pipeDistance;
+                const bracketCenterX = isLeft ? pipeCenter - shift : pipeCenter + shift;
+                const outerHoleX = isLeft
+                    ? bracketCenterX - holeCenterFromBracketCenter
+                    : bracketCenterX + holeCenterFromBracketCenter;
+
+                // Nut inner edge (closest to pipe)
+                const nutInnerEdgeX = isLeft
+                    ? outerHoleX + nutInnerRadius
+                    : outerHoleX - nutInnerRadius;
+
+                // Pipe outer edge
+                const pipeOuterEdge = isLeft ? -pipeRadius : State.pipeDistance + pipeRadius;
+
+                // Clearance (gap between nut inner edge and pipe outer edge)
+                const clearance = isLeft
+                    ? pipeOuterEdge - nutInnerEdgeX  // How far nut is from pipe (negative = overlapping)
+                    : nutInnerEdgeX - pipeOuterEdge;
+
+                // Note: negative clearance means nut is outside pipe (good!)
+                // We want the nut to NOT overlap with pipe horizontally
+                return {
+                    clearance: Math.abs(clearance),
+                    isOk: (isLeft ? nutInnerEdgeX <= pipeOuterEdge : nutInnerEdgeX >= pipeOuterEdge),
+                    required: hw.nutPipeClearance.target
+                };
+            },
+
+            /**
+             * Calculate the optimal bracket shift that satisfies all constraints:
+             * 1. Button head clears shelf edge (min shift)
+             * 2. Nut clears pipe horizontally (min shift)
+             * 3. Inner holes stay over wood/pipe center (max shift)
+             * @returns {object} { shift, minShift, maxShift, hasConflict }
+             */
+            optimalShift() {
+                // Calculate constraints
+                const minShiftButtonHead = this.minShiftForButtonHeadClearance();
+                const minShiftNut = this.minShiftForNutClearance();
+                const maxShiftInnerHoles = this.maxShiftForInnerHoles();
+
+                const minShift = Math.max(minShiftButtonHead, minShiftNut);
+                const maxShift = maxShiftInnerHoles;
+
+                // Check for conflict (min > max means impossible geometry)
+                const hasConflict = minShift > maxShift;
+
+                // Use the minimum required shift (or max if there's conflict)
+                const shift = hasConflict ? maxShift : minShift;
+
+                return {
+                    shift: shift,
+                    minShift: minShift,
+                    maxShift: maxShift,
+                    minShiftButtonHead: minShiftButtonHead,
+                    minShiftNut: minShiftNut,
+                    hasConflict: hasConflict
+                };
             }
         };
 
@@ -368,6 +532,34 @@
                 // Offset by 0.5 for crisp 1px lines
                 const offset = lineWidth % 2 === 1 ? 0.5 : 0;
                 ctx.strokeRect(x + offset, y + offset, width, height);
+            },
+
+            /**
+             * Draw a hexagon (for button screw socket or nut)
+             * @param {number} cx - Center X in pixels
+             * @param {number} cy - Center Y in pixels
+             * @param {number} radius - Radius (to vertex) in pixels
+             * @param {string} fillColor
+             * @param {string} strokeColor (optional)
+             */
+            drawHexagon(cx, cy, radius, fillColor, strokeColor = null) {
+                const ctx = this.ctx;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i - Math.PI / 2; // Start at top vertex
+                    const x = cx + radius * Math.cos(angle);
+                    const y = cy + radius * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+                if (strokeColor) {
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
             },
 
             /**
@@ -532,17 +724,11 @@
             drawBracketTop(xPipeInnerEdge, position, isLeft) {
                 const ctx = this.ctx;
                 const b = CONFIG.bracket;
+                const hw = CONFIG.hardware;
 
-                // Calculate shelf overhang (how much shelf extends past pipe inner edge)
-                const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
-
-                // Distance from bracket center to hole column
-                const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
-
-                // Shift bracket so outer holes FULLY clear the shelf edge
-                // Need to account for hole radius + clearance so the entire hole is outside
-                const holeRadius = b.holeDiameter / 2;
-                const shift = shelfOverhang - holeCenterFromBracketCenter + holeRadius + b.holeClearance;
+                // Get optimal shift from Layout module (considers both shelf edge and nut clearance)
+                const shiftInfo = Layout.optimalShift();
+                const shift = shiftInfo.shift;
 
                 let bracketCenterX;
                 if (isLeft) {
@@ -572,6 +758,7 @@
                 const holeOffsetY = b.holeCenter;  // From bracket edge
 
                 // Hole positions relative to bracket top-left
+                // [0] Top-left, [1] Top-right, [2] Bottom-left, [3] Bottom-right
                 const holes = [
                     { x: bracketX + holeOffsetX, y: bracketY + holeOffsetY },                           // Top-left
                     { x: bracketX + b.width - holeOffsetX, y: bracketY + holeOffsetY },                 // Top-right
@@ -579,11 +766,39 @@
                     { x: bracketX + b.width - holeOffsetX, y: bracketY + b.length - holeOffsetY }       // Bottom-right
                 ];
 
+                // Outer holes (outside shelf edge, get button screws):
+                // Left brackets: left column = indices [0, 2]
+                // Right brackets: right column = indices [1, 3]
+                const outerHoleIndices = isLeft ? [0, 2] : [1, 3];
+
+                // Draw holes first
                 ctx.fillStyle = CONFIG.colors.bracketHole;
-                holes.forEach(hole => {
+                holes.forEach((hole, index) => {
                     ctx.beginPath();
                     ctx.arc(this.toPixelX(hole.x), this.toPixelY(hole.y), holeRadiusPixels, 0, Math.PI * 2);
                     ctx.fill();
+                });
+
+                // Draw button screw heads on outer holes
+                const buttonRadius = this.toPixels(hw.buttonScrew.headDiameter / 2);
+                const socketRadius = this.toPixels(1.5 / 25.4); // ~1.5mm hex socket
+
+                outerHoleIndices.forEach(index => {
+                    const hole = holes[index];
+                    const hx = this.toPixelX(hole.x);
+                    const hy = this.toPixelY(hole.y);
+
+                    // Draw button head (circle)
+                    ctx.beginPath();
+                    ctx.arc(hx, hy, buttonRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = CONFIG.colors.buttonScrewHead;
+                    ctx.fill();
+                    ctx.strokeStyle = CONFIG.colors.buttonScrewHeadStroke;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Draw hex socket in center
+                    this.drawHexagon(hx, hy, socketRadius, CONFIG.colors.buttonScrewSocket);
                 });
             },
 
@@ -608,11 +823,9 @@
                 const ctx = this.ctx;
                 const b = CONFIG.bracket;
 
-                // Calculate shift (same as top view)
-                const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
-                const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
-                const holeRadius = b.holeDiameter / 2;
-                const shift = shelfOverhang - holeCenterFromBracketCenter + holeRadius + b.holeClearance;
+                // Get optimal shift from Layout module (same as top view)
+                const shiftInfo = Layout.optimalShift();
+                const shift = shiftInfo.shift;
 
                 let bracketCenterX;
                 if (isLeft) {
@@ -632,11 +845,151 @@
             },
 
             /**
+             * Draw button screw head in front view (showing it must clear shelf)
+             * @param {number} xPipeInnerEdge - X position of pipe center in inches
+             * @param {boolean} isLeft - true for left pipe bracket, false for right
+             */
+            drawButtonScrewFront(xPipeInnerEdge, isLeft) {
+                const ctx = this.ctx;
+                const b = CONFIG.bracket;
+                const hw = CONFIG.hardware;
+
+                // Get optimal shift from Layout module
+                const shiftInfo = Layout.optimalShift();
+                const shift = shiftInfo.shift;
+
+                let bracketCenterX;
+                if (isLeft) {
+                    bracketCenterX = xPipeInnerEdge - shift;
+                } else {
+                    bracketCenterX = xPipeInnerEdge + shift;
+                }
+                const bracketX = bracketCenterX - b.width / 2;
+
+                // Outer hole X position
+                const outerHoleX = isLeft
+                    ? bracketX + b.holeCenter
+                    : bracketX + b.width - b.holeCenter;
+
+                // Button screw sits on top of bracket, head extends up toward shelf
+                const screwY = -b.thickness - hw.buttonScrew.headHeight;
+                const screwWidth = hw.buttonScrew.headDiameter;
+                const screwHeight = hw.buttonScrew.headHeight;
+
+                const x = this.toPixelX(outerHoleX - screwWidth / 2);
+                const y = this.toPixelY(screwY);
+                const width = this.toPixels(screwWidth);
+                const height = this.toPixels(screwHeight);
+
+                // Draw button head as rounded rectangle
+                ctx.fillStyle = CONFIG.colors.buttonScrewHead;
+                ctx.beginPath();
+                const radius = height / 2;
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + width - radius, y);
+                ctx.arc(x + width - radius, y + radius, radius, -Math.PI/2, Math.PI/2);
+                ctx.lineTo(x + radius, y + height);
+                ctx.arc(x + radius, y + radius, radius, Math.PI/2, -Math.PI/2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = CONFIG.colors.buttonScrewHeadStroke;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            },
+
+            /**
+             * Draw hex cap nuts hanging below bracket in front view
+             * @param {number} xPipeInnerEdge - X position of pipe center in inches
+             * @param {boolean} isLeft - true for left pipe bracket, false for right
+             */
+            drawHexNutsFront(xPipeInnerEdge, isLeft) {
+                const ctx = this.ctx;
+                const b = CONFIG.bracket;
+                const hw = CONFIG.hardware;
+
+                // Get optimal shift from Layout module
+                const shiftInfo = Layout.optimalShift();
+                const shift = shiftInfo.shift;
+
+                let bracketCenterX;
+                if (isLeft) {
+                    bracketCenterX = xPipeInnerEdge - shift;
+                } else {
+                    bracketCenterX = xPipeInnerEdge + shift;
+                }
+                const bracketX = bracketCenterX - b.width / 2;
+
+                // Outer hole X position (where nut hangs)
+                const outerHoleX = isLeft
+                    ? bracketX + b.holeCenter
+                    : bracketX + b.width - b.holeCenter;
+
+                // Nut hangs below bracket - top of nut at y = 0 (top of pipe)
+                const nutWidth = hw.hexCapNut.acrossCorners;
+                const nutHeight = hw.hexCapNut.height;
+                const facetHeight = hw.hexCapNut.acrossFlats; // Height of hex portion
+
+                const x = this.toPixelX(outerHoleX - nutWidth / 2);
+                const y = this.toPixelY(0);  // Top of nut at top of pipe
+                const width = this.toPixels(nutWidth);
+                const totalHeight = this.toPixels(nutHeight);
+                const hexHeight = this.toPixels(facetHeight);
+                const domeHeight = totalHeight - hexHeight;
+
+                // Draw hex body (top portion - the threaded part)
+                ctx.fillStyle = CONFIG.colors.hexNut;
+                ctx.fillRect(x, y, width, hexHeight);
+                ctx.strokeStyle = CONFIG.colors.hexNutStroke;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, width, hexHeight);
+
+                // Draw inner hex detail (darker lines to show hex shape)
+                ctx.strokeStyle = '#8b6508';
+                ctx.lineWidth = 1;
+                const inset = width * 0.15;
+                ctx.beginPath();
+                ctx.moveTo(x + inset, y);
+                ctx.lineTo(x + inset, y + hexHeight);
+                ctx.moveTo(x + width - inset, y);
+                ctx.lineTo(x + width - inset, y + hexHeight);
+                ctx.stroke();
+
+                // Draw domed cap (bottom portion - the acorn cap)
+                const domeRadius = width / 2;
+                const domeStartY = y + hexHeight;
+
+                ctx.beginPath();
+                ctx.moveTo(x, domeStartY);
+                ctx.lineTo(x, domeStartY + domeHeight * 0.3);
+                ctx.quadraticCurveTo(x, domeStartY + domeHeight, x + width/2, domeStartY + domeHeight);
+                ctx.quadraticCurveTo(x + width, domeStartY + domeHeight, x + width, domeStartY + domeHeight * 0.3);
+                ctx.lineTo(x + width, domeStartY);
+                ctx.closePath();
+                ctx.fillStyle = CONFIG.colors.hexNut;
+                ctx.fill();
+                ctx.strokeStyle = CONFIG.colors.hexNutStroke;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Add highlight to dome for 3D effect
+                ctx.beginPath();
+                ctx.arc(x + width/2, domeStartY + domeHeight * 0.6, width * 0.2, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.fill();
+            },
+
+            /**
              * Draw both brackets in front view
              */
             drawBracketsFront() {
                 this.drawBracketFront(0, true);
                 this.drawBracketFront(State.pipeDistance, false);
+                // Draw button screw heads on top of brackets
+                this.drawButtonScrewFront(0, true);
+                this.drawButtonScrewFront(State.pipeDistance, false);
+                // Draw hex nuts hanging below brackets
+                this.drawHexNutsFront(0, true);
+                this.drawHexNutsFront(State.pipeDistance, false);
             },
 
             /**
@@ -707,6 +1060,7 @@
                         State.pipeDistance = value;
                         Renderer.calculateDimensions();
                         Renderer.render();
+                        this.updateClearanceDisplay();
                     }
                 });
 
@@ -716,6 +1070,35 @@
                     Renderer.calculateDimensions();
                     Renderer.render();
                 });
+            },
+
+            /**
+             * Update the clearance display UI
+             */
+            updateClearanceDisplay() {
+                const shiftInfo = Layout.optimalShift();
+                const leftClearance = Layout.nutToPipeClearance(true, shiftInfo.shift);
+                const rightClearance = Layout.nutToPipeClearance(false, shiftInfo.shift);
+
+                const leftEl = document.getElementById('clearance-left');
+                const rightEl = document.getElementById('clearance-right');
+
+                // Format shift info
+                const shiftMm = Units.toMm(shiftInfo.shift);
+                const minMm = Units.toMm(shiftInfo.minShift);
+                const maxMm = Units.toMm(shiftInfo.maxShift);
+
+                if (shiftInfo.hasConflict) {
+                    leftEl.textContent = `CONFLICT: Need ${minMm.toFixed(1)}mm shift, max allowed ${maxMm.toFixed(1)}mm`;
+                    leftEl.style.color = '#c62828';
+                    rightEl.textContent = `Using ${shiftMm.toFixed(1)}mm (inner holes may pass center)`;
+                    rightEl.style.color = '#c62828';
+                } else {
+                    leftEl.textContent = `Shift: ${shiftMm.toFixed(2)}mm (range: ${minMm.toFixed(1)}-${maxMm.toFixed(1)}mm)`;
+                    leftEl.style.color = '#2e7d32';
+                    rightEl.textContent = leftClearance.isOk ? 'Nut clearance: OK' : 'Nut clearance: Check';
+                    rightEl.style.color = leftClearance.isOk ? '#2e7d32' : '#ff9800';
+                }
             }
         };
 
@@ -726,6 +1109,7 @@
             Renderer.init();
             Controls.init();
             Renderer.render();
+            Controls.updateClearanceDisplay();
 
             // Handle window resize
             window.addEventListener('resize', () => {
@@ -743,6 +1127,17 @@
             const gap = CONFIG.shelf.depth - 2 * inset - 2 * CONFIG.bracket.length;
             console.log('Bracket inset (depth):', Units.formatInches(inset, true));
             console.log('Bracket gap between (depth):', Units.formatInches(gap, true));
+
+            // Log clearance info
+            const shiftInfo = Layout.optimalShift();
+            console.log('Bracket shift:', Units.formatInches(shiftInfo.shift, true));
+            console.log('Min shift (button head):', Units.formatInches(shiftInfo.minShiftButtonHead, true));
+            console.log('Min shift (nut clearance):', Units.formatInches(shiftInfo.minShiftNut, true));
+            console.log('Max shift (inner holes):', Units.formatInches(shiftInfo.maxShift, true));
+            if (shiftInfo.hasConflict) {
+                console.warn('CONFLICT: Required min shift exceeds max allowed!');
+                console.warn(`Need ${Units.toMm(shiftInfo.minShift).toFixed(2)}mm, max allowed ${Units.toMm(shiftInfo.maxShift).toFixed(2)}mm`);
+            }
         }
 
         // Start the app when DOM is ready
