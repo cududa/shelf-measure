@@ -3,7 +3,7 @@ import { State } from './state.js';
 import { Renderer } from './renderer.js';
 import { Layout } from './layout.js';
 import { Units } from './units.js';
-import { exportTemplate, exportSVG } from './exporter.js';
+import { exportTemplate, exportSVG, downloadTemplate } from './exporter.js';
 import { Favorites } from './favorites.js';
 
 export const Controls = {
@@ -12,7 +12,8 @@ export const Controls = {
         const pipeDistanceInput = document.getElementById('pipe-distance');
         const nutClearanceInput = document.getElementById('nut-clearance');
         const viewToggleBtn = document.getElementById('view-toggle');
-        const exportBtn = document.getElementById('export-template');
+        const openBtn = document.getElementById('open-template');
+        const downloadBtn = document.getElementById('download-template');
 
         shelfNumberInput.addEventListener('input', (e) => {
             State.shelfNumber = e.target.value.trim();
@@ -60,12 +61,8 @@ export const Controls = {
             Renderer.render();
         });
 
-        exportBtn.addEventListener('click', async () => {
-            // Add loading indicator
-            exportBtn.disabled = true;
-            const originalText = exportBtn.textContent;
-            exportBtn.textContent = 'Generating PDF...';
-
+        openBtn.addEventListener('click', async () => {
+            openBtn.disabled = true;
             try {
                 await exportTemplate();
             } catch (error) {
@@ -73,8 +70,20 @@ export const Controls = {
                 alert('PDF export failed. Falling back to SVG export.');
                 exportSVG();
             } finally {
-                exportBtn.disabled = false;
-                exportBtn.textContent = originalText;
+                openBtn.disabled = false;
+            }
+        });
+
+        downloadBtn.addEventListener('click', async () => {
+            downloadBtn.disabled = true;
+            try {
+                await downloadTemplate();
+            } catch (error) {
+                console.error('PDF download failed:', error);
+                alert('PDF download failed. Falling back to SVG download.');
+                exportSVG();
+            } finally {
+                downloadBtn.disabled = false;
             }
         });
 

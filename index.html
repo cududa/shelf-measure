@@ -157,7 +157,20 @@
         <input type="number" id="nut-clearance" step="0.05" value="0.25" style="width: 60px;">
         <span>mm</span>
         <button id="view-toggle" style="margin-left: 20px; padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer;">View: Top</button>
-        <button id="export-template" style="padding: 6px 12px; border: 1px solid #2e7d32; border-radius: 4px; background: #fff; cursor: pointer; color: #2e7d32;">Export Template</button>
+        <button id="open-template" style="padding: 6px 12px; border: 1px solid #2e7d32; border-radius: 4px; background: #fff; cursor: pointer; color: #2e7d32;" title="Open in new tab">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+        </button>
+        <button id="download-template" style="padding: 6px 12px; border: 1px solid #2e7d32; border-radius: 4px; background: #fff; cursor: pointer; color: #2e7d32;" title="Download PDF">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+        </button>
         <button id="save-favorite" style="padding: 6px 12px; border: 1px solid #f9a825; border-radius: 4px; background: #fff; cursor: pointer; color: #f9a825; font-size: 16px;" title="Save to favorites">★</button>
     </div>
     <div id="clearance-info" style="margin-top: 10px; font-size: 12px; display: flex; gap: 20px;">

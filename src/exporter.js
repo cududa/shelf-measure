@@ -69,9 +69,107 @@ export function exportSVG(svgContent = Template.generateSVG(), prefix = 'shelf-t
 }
 
 /**
- * Default export function - uses PDF
+ * Open template as PDF in new tab
  */
 export async function exportTemplate() {
     const svg = Template.generateSVG();
     await exportPDF(svg, 'shelf-template');
+}
+
+/**
+ * Export multiple templates as a single multi-page PDF in new tab
+ * @param {Array} configs - Array of {shelfNumber, pipeDistance, nutPipeClearance}
+ */
+export async function exportAllToNewTab(configs) {
+    const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'letter',
+        compress: true
+    });
+
+    pdf.setProperties({
+        title: 'Shelf Bracket Drilling Templates',
+        subject: 'Print at 100% scale - do not fit to page',
+        creator: 'Shelf Measure App'
+    });
+
+    const { State } = await import('./state.js');
+    const originalState = {
+        shelfNumber: State.shelfNumber,
+        pipeDistance: State.pipeDistance,
+        nutPipeClearance: State.nutPipeClearance
+    };
+
+    for (let i = 0; i < configs.length; i++) {
+        const config = configs[i];
+
+        // Set state for this config
+        State.shelfNumber = config.shelfNumber || '';
+        State.pipeDistance = config.pipeDistance;
+        State.nutPipeClearance = config.nutPipeClearance;
+
+        // Generate SVG for this config
+        const svg = Template.generateSVG();
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+        const svgElement = svgDoc.documentElement;
+
+        // Add new page for all but the first
+        if (i > 0) {
+            pdf.addPage('letter', 'portrait');
+        }
+
+        await pdf.svg(svgElement, {
+            x: 0,
+            y: 0,
+            width: 612,
+            height: 792
+        });
+    }
+
+    // Restore original state
+    State.shelfNumber = originalState.shelfNumber;
+    State.pipeDistance = originalState.pipeDistance;
+    State.nutPipeClearance = originalState.nutPipeClearance;
+
+    // Open PDF in new tab
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, '_blank');
+}
+
+/**
+ * Download template as PDF file
+ */
+export async function downloadTemplate() {
+    const svg = Template.generateSVG();
+
+    // Parse SVG string to DOM element
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+    const svgElement = svgDoc.documentElement;
+
+    const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'letter',
+        compress: true
+    });
+
+    pdf.setProperties({
+        title: 'Shelf Bracket Drilling Template',
+        subject: 'Print at 100% scale - do not fit to page',
+        creator: 'Shelf Measure App'
+    });
+
+    await pdf.svg(svgElement, {
+        x: 0,
+        y: 0,
+        width: 612,
+        height: 792
+    });
+
+    // Download PDF
+    pdf.save(generateFileName('shelf-template', 'pdf'));
 }
