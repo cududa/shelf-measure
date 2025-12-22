@@ -16,7 +16,9 @@ export const Template = {
         const b = CONFIG.bracket;
         const shiftInfo = Layout.optimalShift();
         const shift = shiftInfo.shift;
-        const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
+        // pipeDistance is inside-to-inside, so center-to-center = pipeDistance + diameter
+        const pipeCenterToCenter = State.pipeDistance + CONFIG.pipe.diameter;
+        const shelfOverhang = (CONFIG.shelf.width - pipeCenterToCenter) / 2;
         const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
         const bracketTopInset = Layout.bracketYTopView('top');
 

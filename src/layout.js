@@ -30,7 +30,9 @@ export const Layout = {
     minShiftForButtonHeadClearance() {
         const b = CONFIG.bracket;
         const hw = CONFIG.hardware;
-        const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
+        // pipeDistance is inside-to-inside, so center-to-center = pipeDistance + diameter
+        const pipeCenterToCenter = State.pipeDistance + CONFIG.pipe.diameter;
+        const shelfOverhang = (CONFIG.shelf.width - pipeCenterToCenter) / 2;
         const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
         const buttonHeadRadius = hw.buttonScrew.headDiameter / 2;
 
@@ -55,10 +57,12 @@ export const Layout = {
         const hw = CONFIG.hardware;
         const b = CONFIG.bracket;
         const pipeRadius = CONFIG.pipe.diameter / 2;
+        const pipeDiameter = CONFIG.pipe.diameter;
         const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
         const nutInnerRadius = hw.hexCapNut.acrossFlats / 2;
 
-        const pipeCenter = isLeft ? 0 : State.pipeDistance;
+        // pipeDistance is inside-to-inside, so right pipe center = pipeDistance + diameter
+        const pipeCenter = isLeft ? 0 : State.pipeDistance + pipeDiameter;
         const bracketCenterX = isLeft ? pipeCenter - shift : pipeCenter + shift;
         const outerHoleX = isLeft
             ? bracketCenterX - holeCenterFromBracketCenter
@@ -68,7 +72,8 @@ export const Layout = {
             ? outerHoleX + nutInnerRadius
             : outerHoleX - nutInnerRadius;
 
-        const pipeOuterEdge = isLeft ? -pipeRadius : State.pipeDistance + pipeRadius;
+        // Right pipe outer edge = pipeDistance + diameter + radius
+        const pipeOuterEdge = isLeft ? -pipeRadius : State.pipeDistance + pipeDiameter + pipeRadius;
 
         const clearance = isLeft
             ? pipeOuterEdge - nutInnerEdgeX
