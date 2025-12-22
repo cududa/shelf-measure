@@ -51,8 +51,10 @@ export const Template = {
         // Add 1" scale reference square (convert inches to pixels) near top-left margin
         svg += this.drawScaleReference(pageWidthPx - 1.8 * dpi, pageHeightPx - 1.8 * dpi, dpi);
 
-        // Add title
-        svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi}" class="label" text-anchor="middle" style="font-size: 14px;">Shelf Bracket Drilling Template</text>`;
+        // Add title and pipe distance
+        const shelfLabel = State.shelfNumber ? `Shelf ${State.shelfNumber} ` : '';
+        svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi}" class="label" text-anchor="middle" style="font-size: 14px;">${shelfLabel}Bracket Drilling Template</text>`;
+        svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi + 16}" class="label" text-anchor="middle" style="font-size: 11px;">Pipe Distance: ${State.pipeDistance}, ${Units.formatWithFraction(State.pipeDistance)}</text>`;
 
         const templateCenterX = pageWidthPx / 2;
         const templateOffsetX = 3.2 * dpi;

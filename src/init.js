@@ -5,7 +5,6 @@ import { CONFIG } from './config.js';
 import { Layout } from './layout.js';
 import { State } from './state.js';
 import { Template } from './template.js';
-import { CalibrationTemplate } from './calibration-template.js';
 
 export function init() {
     Renderer.init();
@@ -22,23 +21,16 @@ export function init() {
     window.addEventListener('beforeprint', () => {
         const templateContainer = document.getElementById('template-container');
         // Always render fresh printable view before printing
-        if (State.view === 'calibration') {
-            CalibrationTemplate.render();
-        } else {
-            Template.render();
-        }
+        Template.render();
         templateContainer.style.display = 'block';
     });
 
     window.addEventListener('afterprint', () => {
-        // Restore visibility based on current view
+        // Restore canvas view after printing
         const templateContainer = document.getElementById('template-container');
         const canvasContainer = document.getElementById('canvas-container');
-
-        if (State.view !== 'template' && State.view !== 'calibration') {
-            templateContainer.style.display = 'none';
-            canvasContainer.style.display = 'block';
-        }
+        templateContainer.style.display = 'none';
+        canvasContainer.style.display = 'block';
     });
 
     // Log dimensions for verification

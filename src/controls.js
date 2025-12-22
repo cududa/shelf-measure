@@ -3,30 +3,26 @@ import { State } from './state.js';
 import { Renderer } from './renderer.js';
 import { Layout } from './layout.js';
 import { Units } from './units.js';
-import { Template } from './template.js';
-import { CalibrationTemplate } from './calibration-template.js';
-import { exportTemplate, exportSVG, exportCalibration } from './exporter.js';
+import { exportTemplate, exportSVG } from './exporter.js';
 
 export const Controls = {
     init() {
+        const shelfNumberInput = document.getElementById('shelf-number');
         const pipeDistanceInput = document.getElementById('pipe-distance');
         const nutClearanceInput = document.getElementById('nut-clearance');
         const viewToggleBtn = document.getElementById('view-toggle');
         const exportBtn = document.getElementById('export-template');
-        const exportCalibrationBtn = document.getElementById('export-calibration');
+
+        shelfNumberInput.addEventListener('input', (e) => {
+            State.shelfNumber = e.target.value.trim();
+        });
 
         pipeDistanceInput.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             if (!isNaN(value) && value > 0) {
                 State.pipeDistance = value;
-                if (State.view === 'template') {
-                    Template.render();
-                } else if (State.view === 'calibration') {
-                    CalibrationTemplate.render();
-                } else {
-                    Renderer.calculateDimensions();
-                    Renderer.render();
-                }
+                Renderer.calculateDimensions();
+                Renderer.render();
                 this.updateClearanceDisplay();
             }
         });
@@ -35,13 +31,7 @@ export const Controls = {
             const valueMm = parseFloat(e.target.value);
             if (!isNaN(valueMm) && valueMm >= 0) {
                 State.nutPipeClearance = valueMm / 25.4;  // Convert mm to inches
-                if (State.view === 'template') {
-                    Template.render();
-                } else if (State.view === 'calibration') {
-                    CalibrationTemplate.render();
-                } else {
-                    Renderer.render();
-                }
+                Renderer.render();
                 this.updateClearanceDisplay();
 
                 // Warn if gap is too small (< 1.0mm recommended minimum)
@@ -58,47 +48,18 @@ export const Controls = {
         });
 
         viewToggleBtn.addEventListener('click', () => {
-            // Cycle: top -> front -> template -> calibration -> top
-            if (State.view === 'top') {
-                State.view = 'front';
-            } else if (State.view === 'front') {
-                State.view = 'template';
-            } else if (State.view === 'template') {
-                State.view = 'calibration';
-            } else {
-                State.view = 'top';
-            }
+            // Cycle: top -> front -> top
+            State.view = State.view === 'top' ? 'front' : 'top';
 
             // Update button text
-            const viewNames = { top: 'Top', front: 'Front', template: 'Template', calibration: 'Calibration' };
+            const viewNames = { top: 'Top', front: 'Front' };
             viewToggleBtn.textContent = `View: ${viewNames[State.view]}`;
 
-            // Show/hide appropriate containers
-            const canvasContainer = document.getElementById('canvas-container');
-            const templateContainer = document.getElementById('template-container');
-
-            if (State.view === 'template' || State.view === 'calibration') {
-                canvasContainer.style.display = 'none';
-                templateContainer.style.display = 'block';
-                if (State.view === 'template') {
-                    Template.render();
-                } else {
-                    CalibrationTemplate.render();
-                }
-            } else {
-                canvasContainer.style.display = 'block';
-                templateContainer.style.display = 'none';
-                Renderer.calculateDimensions();
-                Renderer.render();
-            }
+            Renderer.calculateDimensions();
+            Renderer.render();
         });
 
         exportBtn.addEventListener('click', async () => {
-            if (State.view !== 'template') {
-                // ensure template view reflects latest numbers
-                Template.render();
-            }
-
             // Add loading indicator
             exportBtn.disabled = true;
             const originalText = exportBtn.textContent;
@@ -113,27 +74,6 @@ export const Controls = {
             } finally {
                 exportBtn.disabled = false;
                 exportBtn.textContent = originalText;
-            }
-        });
-
-        exportCalibrationBtn.addEventListener('click', async () => {
-            if (State.view !== 'calibration') {
-                CalibrationTemplate.render();
-            }
-
-            exportCalibrationBtn.disabled = true;
-            const originalText = exportCalibrationBtn.textContent;
-            exportCalibrationBtn.textContent = 'Generating PDF...';
-
-            try {
-                await exportCalibration();
-            } catch (error) {
-                console.error('Calibration PDF export failed:', error);
-                alert('Calibration PDF export failed. Falling back to SVG export.');
-                exportSVG(CalibrationTemplate.generateSVG(), 'shelf-calibration');
-            } finally {
-                exportCalibrationBtn.disabled = false;
-                exportCalibrationBtn.textContent = originalText;
             }
         });
     },

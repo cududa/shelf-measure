@@ -1,7 +1,6 @@
 import { jsPDF } from 'jspdf';
 import 'svg2pdf.js';
 import { Template } from './template.js';
-import { CalibrationTemplate } from './calibration-template.js';
 import { State } from './state.js';
 
 function generateFileName(prefix, extension) {
@@ -46,8 +45,10 @@ async function exportPDF(svgContent, prefix) {
         height: 792
     });
 
-    // Save the PDF
-    pdf.save(generateFileName(prefix, 'pdf'));
+    // Open PDF in new tab
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, '_blank');
 }
 
 /**
@@ -73,9 +74,4 @@ export function exportSVG(svgContent = Template.generateSVG(), prefix = 'shelf-t
 export async function exportTemplate() {
     const svg = Template.generateSVG();
     await exportPDF(svg, 'shelf-template');
-}
-
-export async function exportCalibration() {
-    const svg = CalibrationTemplate.generateSVG();
-    await exportPDF(svg, 'shelf-calibration');
 }

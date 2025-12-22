@@ -98,7 +98,9 @@
         <!-- SVG template will be inserted here -->
     </div>
     <div id="controls">
-        <label for="pipe-distance">Pipe Distance:</label>
+        <label for="shelf-number">Shelf #:</label>
+        <input type="text" id="shelf-number" placeholder="1, a, etc." style="width: 50px;">
+        <label for="pipe-distance" style="margin-left: 20px;">Pipe Distance:</label>
         <input type="number" id="pipe-distance" step="0.00001" value="28.96875">
         <span>inches</span>
         <label for="nut-clearance" style="margin-left: 20px;">Nut-Pipe Gap:</label>
@@ -106,7 +108,6 @@
         <span>mm</span>
         <button id="view-toggle" style="margin-left: 20px; padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer;">View: Top</button>
         <button id="export-template" style="padding: 6px 12px; border: 1px solid #2e7d32; border-radius: 4px; background: #fff; cursor: pointer; color: #2e7d32;">Export Template</button>
-        <button id="export-calibration" style="padding: 6px 12px; border: 1px solid #1565c0; border-radius: 4px; background: #fff; cursor: pointer; color: #1565c0;">Export Calibration Sheet</button>
     </div>
     <div id="clearance-info" style="margin-top: 10px; font-size: 12px; display: flex; gap: 20px;">
         <span id="clearance-left">Nut clearance (L): --</span>

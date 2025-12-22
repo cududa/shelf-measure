@@ -84,21 +84,16 @@ export const Layout = {
     optimalShift() {
         const minShiftButtonHead = this.minShiftForButtonHeadClearance();
         const minShiftNut = this.minShiftForNutClearance();
-        const maxShiftInnerHoles = this.maxShiftForInnerHoles();
 
-        const minShift = Math.max(minShiftButtonHead, minShiftNut);
-        const maxShift = maxShiftInnerHoles;
-
-        const hasConflict = minShift > maxShift;
-        const shift = hasConflict ? maxShift : minShift;
+        const shift = Math.max(minShiftButtonHead, minShiftNut);
 
         return {
             shift,
-            minShift,
-            maxShift,
+            minShift: shift,
+            maxShift: shift,
             minShiftButtonHead,
             minShiftNut,
-            hasConflict
+            hasConflict: false
         };
     }
 };
