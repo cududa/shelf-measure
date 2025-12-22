@@ -1,22 +1,20 @@
 import { jsPDF } from 'jspdf';
 import 'svg2pdf.js';
 import { Template } from './template.js';
+import { CalibrationTemplate } from './calibration-template.js';
 import { State } from './state.js';
 
-function generateFileName(extension) {
+function generateFileName(prefix, extension) {
     const distance = State.pipeDistance.toFixed(3).replace(/\./g, '-');
     const timestamp = new Date().toISOString().replace(/[:T]/g, '-').split('.')[0];
-    return `shelf-template-${distance}-${timestamp}.${extension}`;
+    return `${prefix}-${distance}-${timestamp}.${extension}`;
 }
 
 /**
  * Export template as PDF using jsPDF + svg2pdf.js
  * Uses 72 points per inch which maps 1:1 to our SVG coordinates
  */
-export async function exportPDF() {
-    // Generate SVG content
-    const svgContent = Template.generateSVG();
-
+async function exportPDF(svgContent, prefix) {
     // Parse SVG string to DOM element
     const parser = new DOMParser();
     const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
@@ -49,20 +47,19 @@ export async function exportPDF() {
     });
 
     // Save the PDF
-    pdf.save(generateFileName('pdf'));
+    pdf.save(generateFileName(prefix, 'pdf'));
 }
 
 /**
  * Export template as SVG (fallback)
  */
-export function exportSVG() {
-    const svgContent = Template.generateSVG();
+export function exportSVG(svgContent = Template.generateSVG(), prefix = 'shelf-template') {
     const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement('a');
     link.href = url;
-    link.download = generateFileName('svg');
+    link.download = generateFileName(prefix, 'svg');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -74,5 +71,11 @@ export function exportSVG() {
  * Default export function - uses PDF
  */
 export async function exportTemplate() {
-    await exportPDF();
+    const svg = Template.generateSVG();
+    await exportPDF(svg, 'shelf-template');
+}
+
+export async function exportCalibration() {
+    const svg = CalibrationTemplate.generateSVG();
+    await exportPDF(svg, 'shelf-calibration');
 }

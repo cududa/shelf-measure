@@ -17,7 +17,7 @@ export const Template = {
         const shiftInfo = Layout.optimalShift();
         const shift = shiftInfo.shift;
         const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
-        const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+        const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
         const bracketTopInset = Layout.bracketYTopView('top');
 
         // Key measurements
@@ -108,8 +108,12 @@ export const Template = {
         // Convert bracket dimensions to pixels
         const bracketWidthPx = b.width * dpi;
         const bracketLengthPx = b.length * dpi;
-        const holeCenterPx = b.holeCenter * dpi;
         const holeDiameterPx = b.holeDiameter * dpi;
+        // Hole offsets from each edge
+        const holeLeftPx = b.holes.left * dpi;
+        const holeRightPx = b.holes.right * dpi;
+        const holeTopPx = b.holes.top * dpi;
+        const holeBottomPx = b.holes.bottom * dpi;
         const bracketEdgePx = bracketEdge * dpi;
 
         // Ensure the board preview extends past the bracket
@@ -138,10 +142,10 @@ export const Template = {
 
         // Draw the 4 drill holes with crosshairs
         const holes = [
-            { x: bracketX + holeCenterPx, y: bracketY + holeCenterPx },
-            { x: bracketX + bracketWidthPx - holeCenterPx, y: bracketY + holeCenterPx },
-            { x: bracketX + holeCenterPx, y: bracketY + bracketLengthPx - holeCenterPx },
-            { x: bracketX + bracketWidthPx - holeCenterPx, y: bracketY + bracketLengthPx - holeCenterPx }
+            { x: bracketX + holeLeftPx, y: bracketY + holeTopPx },
+            { x: bracketX + bracketWidthPx - holeRightPx, y: bracketY + holeTopPx },
+            { x: bracketX + holeLeftPx, y: bracketY + bracketLengthPx - holeBottomPx },
+            { x: bracketX + bracketWidthPx - holeRightPx, y: bracketY + bracketLengthPx - holeBottomPx }
         ];
 
         holes.forEach((hole) => {

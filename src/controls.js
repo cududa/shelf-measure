@@ -4,7 +4,8 @@ import { Renderer } from './renderer.js';
 import { Layout } from './layout.js';
 import { Units } from './units.js';
 import { Template } from './template.js';
-import { exportTemplate, exportSVG } from './exporter.js';
+import { CalibrationTemplate } from './calibration-template.js';
+import { exportTemplate, exportSVG, exportCalibration } from './exporter.js';
 
 export const Controls = {
     init() {
@@ -12,6 +13,7 @@ export const Controls = {
         const nutClearanceInput = document.getElementById('nut-clearance');
         const viewToggleBtn = document.getElementById('view-toggle');
         const exportBtn = document.getElementById('export-template');
+        const exportCalibrationBtn = document.getElementById('export-calibration');
 
         pipeDistanceInput.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
@@ -19,6 +21,8 @@ export const Controls = {
                 State.pipeDistance = value;
                 if (State.view === 'template') {
                     Template.render();
+                } else if (State.view === 'calibration') {
+                    CalibrationTemplate.render();
                 } else {
                     Renderer.calculateDimensions();
                     Renderer.render();
@@ -33,6 +37,8 @@ export const Controls = {
                 State.nutPipeClearance = valueMm / 25.4;  // Convert mm to inches
                 if (State.view === 'template') {
                     Template.render();
+                } else if (State.view === 'calibration') {
+                    CalibrationTemplate.render();
                 } else {
                     Renderer.render();
                 }
@@ -52,27 +58,33 @@ export const Controls = {
         });
 
         viewToggleBtn.addEventListener('click', () => {
-            // Cycle: top -> front -> template -> top
+            // Cycle: top -> front -> template -> calibration -> top
             if (State.view === 'top') {
                 State.view = 'front';
             } else if (State.view === 'front') {
                 State.view = 'template';
+            } else if (State.view === 'template') {
+                State.view = 'calibration';
             } else {
                 State.view = 'top';
             }
 
             // Update button text
-            const viewNames = { top: 'Top', front: 'Front', template: 'Template' };
+            const viewNames = { top: 'Top', front: 'Front', template: 'Template', calibration: 'Calibration' };
             viewToggleBtn.textContent = `View: ${viewNames[State.view]}`;
 
             // Show/hide appropriate containers
             const canvasContainer = document.getElementById('canvas-container');
             const templateContainer = document.getElementById('template-container');
 
-            if (State.view === 'template') {
+            if (State.view === 'template' || State.view === 'calibration') {
                 canvasContainer.style.display = 'none';
                 templateContainer.style.display = 'block';
-                Template.render();
+                if (State.view === 'template') {
+                    Template.render();
+                } else {
+                    CalibrationTemplate.render();
+                }
             } else {
                 canvasContainer.style.display = 'block';
                 templateContainer.style.display = 'none';
@@ -101,6 +113,27 @@ export const Controls = {
             } finally {
                 exportBtn.disabled = false;
                 exportBtn.textContent = originalText;
+            }
+        });
+
+        exportCalibrationBtn.addEventListener('click', async () => {
+            if (State.view !== 'calibration') {
+                CalibrationTemplate.render();
+            }
+
+            exportCalibrationBtn.disabled = true;
+            const originalText = exportCalibrationBtn.textContent;
+            exportCalibrationBtn.textContent = 'Generating PDF...';
+
+            try {
+                await exportCalibration();
+            } catch (error) {
+                console.error('Calibration PDF export failed:', error);
+                alert('Calibration PDF export failed. Falling back to SVG export.');
+                exportSVG(CalibrationTemplate.generateSVG(), 'shelf-calibration');
+            } finally {
+                exportCalibrationBtn.disabled = false;
+                exportCalibrationBtn.textContent = originalText;
             }
         });
     },
@@ -143,7 +176,7 @@ export const Controls = {
     updatePlacementGuide(shift) {
         const b = CONFIG.bracket;
         const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
-        const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+        const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
 
         // Distance from shelf edge to bracket outer edge
         // Bracket outer edge (for left bracket) is at: -shift - b.width/2

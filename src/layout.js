@@ -31,7 +31,7 @@ export const Layout = {
         const b = CONFIG.bracket;
         const hw = CONFIG.hardware;
         const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
-        const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+        const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
         const buttonHeadRadius = hw.buttonScrew.headDiameter / 2;
 
         return shelfOverhang - holeCenterFromBracketCenter + buttonHeadRadius + b.holeClearance;
@@ -40,14 +40,14 @@ export const Layout = {
     minShiftForNutClearance() {
         const hw = CONFIG.hardware;
         const pipeRadius = CONFIG.pipe.diameter / 2;
-        const holeCenterFromBracketCenter = CONFIG.bracket.width / 2 - CONFIG.bracket.holeCenter;
+        const holeCenterFromBracketCenter = CONFIG.bracket.width / 2 - CONFIG.bracket.holes.left;
         const nutInnerRadius = hw.hexCapNut.acrossFlats / 2;
 
         return pipeRadius - holeCenterFromBracketCenter + nutInnerRadius + State.nutPipeClearance;
     },
 
     maxShiftForInnerHoles() {
-        const holeCenterFromBracketCenter = CONFIG.bracket.width / 2 - CONFIG.bracket.holeCenter;
+        const holeCenterFromBracketCenter = CONFIG.bracket.width / 2 - CONFIG.bracket.holes.left;
         return holeCenterFromBracketCenter;
     },
 
@@ -55,7 +55,7 @@ export const Layout = {
         const hw = CONFIG.hardware;
         const b = CONFIG.bracket;
         const pipeRadius = CONFIG.pipe.diameter / 2;
-        const holeCenterFromBracketCenter = b.width / 2 - b.holeCenter;
+        const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
         const nutInnerRadius = hw.hexCapNut.acrossFlats / 2;
 
         const pipeCenter = isLeft ? 0 : State.pipeDistance;

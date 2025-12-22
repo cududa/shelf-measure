@@ -376,18 +376,15 @@ export const Renderer = {
         this.strokeRect(x, y, width, height, CONFIG.colors.bracketStroke, 1);
 
         // Draw 4 holes (2x2 pattern)
-        // Holes are 8mm from each edge
         const holeRadiusPixels = this.toPixels(b.holeDiameter / 2);
-        const holeOffsetX = b.holeCenter;  // From bracket edge
-        const holeOffsetY = b.holeCenter;  // From bracket edge
 
         // Hole positions relative to bracket top-left
         // [0] Top-left, [1] Top-right, [2] Bottom-left, [3] Bottom-right
         const holes = [
-            { x: bracketX + holeOffsetX, y: bracketY + holeOffsetY },                           // Top-left
-            { x: bracketX + b.width - holeOffsetX, y: bracketY + holeOffsetY },                 // Top-right
-            { x: bracketX + holeOffsetX, y: bracketY + b.length - holeOffsetY },                // Bottom-left
-            { x: bracketX + b.width - holeOffsetX, y: bracketY + b.length - holeOffsetY }       // Bottom-right
+            { x: bracketX + b.holes.left, y: bracketY + b.holes.top },                              // Top-left
+            { x: bracketX + b.width - b.holes.right, y: bracketY + b.holes.top },                   // Top-right
+            { x: bracketX + b.holes.left, y: bracketY + b.length - b.holes.bottom },                // Bottom-left
+            { x: bracketX + b.width - b.holes.right, y: bracketY + b.length - b.holes.bottom }      // Bottom-right
         ];
 
         // Outer holes (outside shelf edge, get button screws):
@@ -492,8 +489,8 @@ export const Renderer = {
 
         // Outer hole X position
         const outerHoleX = isLeft
-            ? bracketX + b.holeCenter
-            : bracketX + b.width - b.holeCenter;
+            ? bracketX + b.holes.left
+            : bracketX + b.width - b.holes.right;
 
         // Button screw sits on top of bracket, head extends up toward shelf
         const screwY = -b.thickness - hw.buttonScrew.headHeight;
@@ -545,8 +542,8 @@ export const Renderer = {
 
         // Outer hole X position (where nut hangs)
         const outerHoleX = isLeft
-            ? bracketX + b.holeCenter
-            : bracketX + b.width - b.holeCenter;
+            ? bracketX + b.holes.left
+            : bracketX + b.width - b.holes.right;
 
         // Nut hangs below bracket - top of nut at y = 0 (top of pipe)
         const nutWidth = hw.hexCapNut.acrossCorners;

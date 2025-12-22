@@ -14,8 +14,12 @@ export const CONFIG = {
         width: 38 / 25.4,           // 38mm = 1.4961"
         length: 60 / 25.4,          // 60mm = 2.3622" (along pipe)
         thickness: 1.5 / 25.4,      // 1.5mm = 0.05906"
-        holeCenter: 8 / 25.4,       // 8mm from edge to hole center = 0.31496"
-        holeDiameter: 4.5 / 25.4,   // 4.5mm = 0.17717"
+        holes: {
+            left: 9 / 25.4,
+            right: 9 / 25.4,
+            bottom: 9 / 25.4,
+            top: 9 / 25.4,
+        }, holeDiameter: 4.5 / 25.4,   // 4.5mm = 0.17717"
         holeClearance: 1 / 16       // Keep holes this far inside/outside shelf edges
     },
     hardware: {
