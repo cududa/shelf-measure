@@ -8,7 +8,8 @@ import { exportTemplate, exportSVG } from './exporter.js';
 export const Controls = {
     init() {
         const shelfNumberInput = document.getElementById('shelf-number');
-        const pipeDistanceInput = document.getElementById('pipe-distance');
+        const pipeDistanceFrontInput = document.getElementById('pipe-distance-front');
+        const pipeDistanceBackInput = document.getElementById('pipe-distance-back');
         const nutClearanceInput = document.getElementById('nut-clearance');
         const viewToggleBtn = document.getElementById('view-toggle');
         const exportBtn = document.getElementById('export-template');
@@ -17,10 +18,20 @@ export const Controls = {
             State.shelfNumber = e.target.value.trim();
         });
 
-        pipeDistanceInput.addEventListener('input', (e) => {
+        pipeDistanceFrontInput.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             if (!isNaN(value) && value > 0) {
-                State.pipeDistance = value;
+                State.pipeDistanceFront = value;
+                Renderer.calculateDimensions();
+                Renderer.render();
+                this.updateClearanceDisplay();
+            }
+        });
+
+        pipeDistanceBackInput.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            if (!isNaN(value) && value > 0) {
+                State.pipeDistanceBack = value;
                 Renderer.calculateDimensions();
                 Renderer.render();
                 this.updateClearanceDisplay();
@@ -82,60 +93,66 @@ export const Controls = {
      * Update the clearance display UI
      */
     updateClearanceDisplay() {
-        const shiftInfo = Layout.optimalShift();
-        const leftClearance = Layout.nutToPipeClearance(true, shiftInfo.shift);
-        const rightClearance = Layout.nutToPipeClearance(false, shiftInfo.shift);
+        // Get shifts for both front and back positions
+        const shiftInfoFront = Layout.optimalShift('bottom');
+        const shiftInfoBack = Layout.optimalShift('top');
 
         const leftEl = document.getElementById('clearance-left');
         const rightEl = document.getElementById('clearance-right');
 
-        // Format shift info
-        const shiftMm = Units.toMm(shiftInfo.shift);
-        const minMm = Units.toMm(shiftInfo.minShift);
-        const maxMm = Units.toMm(shiftInfo.maxShift);
+        // Format shift info for front (bottom brackets)
+        const shiftMmFront = Units.toMm(shiftInfoFront.shift);
+        const shiftMmBack = Units.toMm(shiftInfoBack.shift);
 
-        if (shiftInfo.hasConflict) {
-            leftEl.textContent = `CONFLICT: Need ${minMm.toFixed(1)}mm shift, max allowed ${maxMm.toFixed(1)}mm`;
-            leftEl.style.color = '#c62828';
-            rightEl.textContent = `Using ${shiftMm.toFixed(1)}mm (inner holes may pass center)`;
+        leftEl.textContent = `Front shift: ${shiftMmFront.toFixed(2)}mm | Back shift: ${shiftMmBack.toFixed(2)}mm`;
+        leftEl.style.color = '#2e7d32';
+
+        const frontLeftClear = Layout.nutToPipeClearance(true, shiftInfoFront.shift, 'bottom');
+        const frontRightClear = Layout.nutToPipeClearance(false, shiftInfoFront.shift, 'bottom');
+        const backLeftClear = Layout.nutToPipeClearance(true, shiftInfoBack.shift, 'top');
+        const backRightClear = Layout.nutToPipeClearance(false, shiftInfoBack.shift, 'top');
+
+        const minFrontClear = Math.min(frontLeftClear.clearance, frontRightClear.clearance);
+        const minBackClear = Math.min(backLeftClear.clearance, backRightClear.clearance);
+
+        const minClearance = Math.min(minFrontClear, minBackClear);
+
+        if (minClearance < 0) {
+            const overlapMm = Units.toMm(Math.abs(minClearance));
+            rightEl.textContent = `WARNING: Nut overlaps pipe by ${overlapMm.toFixed(2)}mm`;
             rightEl.style.color = '#c62828';
         } else {
-            leftEl.textContent = `Shift: ${shiftMm.toFixed(2)}mm (range: ${minMm.toFixed(1)}-${maxMm.toFixed(1)}mm)`;
-            leftEl.style.color = '#2e7d32';
-            rightEl.textContent = leftClearance.isOk ? 'Nut clearance: OK' : 'Nut clearance: Check';
-            rightEl.style.color = leftClearance.isOk ? '#2e7d32' : '#ff9800';
+            const frontMm = Units.toMm(minFrontClear);
+            const backMm = Units.toMm(minBackClear);
+            rightEl.textContent = `Nut clearance: Front ${frontMm.toFixed(2)}mm | Back ${backMm.toFixed(2)}mm`;
+            rightEl.style.color = '#2e7d32';
         }
 
-        // Update placement guide
-        this.updatePlacementGuide(shiftInfo.shift);
+        // Update placement guide for both positions
+        this.updatePlacementGuide(shiftInfoFront.shift, shiftInfoBack.shift);
     },
 
     /**
      * Update the placement guide display with practical measurements
      */
-    updatePlacementGuide(shift) {
+    updatePlacementGuide(shiftFront, shiftBack) {
         const b = CONFIG.bracket;
-        const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
         const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
 
-        // Distance from shelf edge to bracket outer edge
-        // Bracket outer edge (for left bracket) is at: -shift - b.width/2
-        // Shelf edge is at: -shelfOverhang
-        // Distance = shelfEdge - bracketOuterEdge = -shelfOverhang - (-shift - b.width/2)
-        //          = -shelfOverhang + shift + b.width/2 = shift + b.width/2 - shelfOverhang
-        const bracketEdgeFromShelfEdge = shift + b.width / 2 - shelfOverhang;
+        // Calculate for front (bottom) brackets
+        const shelfOverhangFront = (CONFIG.shelf.width - State.pipeDistanceFront) / 2;
+        const bracketEdgeFront = shiftFront + b.width / 2 - shelfOverhangFront;
+        const innerHoleFront = shelfOverhangFront - shiftFront + holeCenterFromBracketCenter;
 
-        // Distance from shelf edge to inner drill hole center
-        // Inner hole (for left bracket) is at: -shift + holeCenterFromBracketCenter
-        // Distance = shelfEdge - innerHoleX = -shelfOverhang - (-shift + holeCenterFromBracketCenter)
-        //          = -shelfOverhang + shift - holeCenterFromBracketCenter
-        // But we want positive "inward" distance, so:
-        const innerHoleFromShelfEdge = shelfOverhang - shift + holeCenterFromBracketCenter;
+        // Calculate for back (top) brackets
+        const shelfOverhangBack = (CONFIG.shelf.width - State.pipeDistanceBack) / 2;
+        const bracketEdgeBack = shiftBack + b.width / 2 - shelfOverhangBack;
+        const innerHoleBack = shelfOverhangBack - shiftBack + holeCenterFromBracketCenter;
 
         const bracketEdgeEl = document.getElementById('bracket-edge-distance');
         const drillHoleEl = document.getElementById('drill-hole-distance');
 
-        bracketEdgeEl.textContent = `Bracket outer edge from shelf edge: ${Units.formatWithFraction(bracketEdgeFromShelfEdge)}`;
-        drillHoleEl.textContent = `Inner drill hole from edge: ${Units.formatWithFraction(innerHoleFromShelfEdge)}`;
+        bracketEdgeEl.textContent = `Front: ${Units.formatWithFraction(bracketEdgeFront)} | Back: ${Units.formatWithFraction(bracketEdgeBack)}`;
+        drillHoleEl.textContent = `Front hole: ${Units.formatWithFraction(innerHoleFront)} | Back hole: ${Units.formatWithFraction(innerHoleBack)}`;
     }
 };

@@ -47,6 +47,11 @@
             color: #666;
         }
 
+        /* Template page styles (screen) */
+        .template-page {
+            display: inline-block;
+        }
+
         @page {
             size: letter portrait;
             margin: 0;
@@ -66,21 +71,33 @@
             }
             #template-container {
                 display: block !important;
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 8.5in !important;
-                height: 11in !important;
+                position: static !important;
+                width: auto !important;
+                height: auto !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 box-shadow: none !important;
                 border-radius: 0 !important;
                 background: white !important;
             }
-            #template-container svg {
+            .template-page {
+                display: block !important;
+                width: 8.5in !important;
+                height: 11in !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                page-break-after: always;
+                page-break-inside: avoid;
+            }
+            .template-page:last-child {
+                page-break-after: auto;
+            }
+            .template-page svg {
                 width: 8.5in !important;
                 height: 11in !important;
                 max-width: none !important;
+                display: block !important;
             }
         }
     </style>
@@ -100,9 +117,12 @@
     <div id="controls">
         <label for="shelf-number">Shelf #:</label>
         <input type="text" id="shelf-number" placeholder="1, a, etc." style="width: 50px;">
-        <label for="pipe-distance" style="margin-left: 20px;">Pipe Distance:</label>
-        <input type="number" id="pipe-distance" step="0.00001" value="28.96875">
-        <span>inches</span>
+        <label for="pipe-distance-front" style="margin-left: 20px;">Front Pipe:</label>
+        <input type="number" id="pipe-distance-front" step="0.00001" value="28.96875">
+        <span>in</span>
+        <label for="pipe-distance-back" style="margin-left: 10px;">Back Pipe:</label>
+        <input type="number" id="pipe-distance-back" step="0.00001" value="28.96875">
+        <span>in</span>
         <label for="nut-clearance" style="margin-left: 20px;">Nut-Pipe Gap:</label>
         <input type="number" id="nut-clearance" step="0.1" value="1" style="width: 60px;">
         <span>mm</span>

@@ -37,21 +37,23 @@ export function init() {
     console.log('Shelf Measure initialized');
     console.log('Shelf:', Units.formatInches(CONFIG.shelf.width, true), 'x', Units.formatInches(CONFIG.shelf.depth, true));
     console.log('Pipe diameter:', Units.formatInches(CONFIG.pipe.diameter, true));
-    console.log('Pipe distance:', Units.formatInches(State.pipeDistance, true));
+    console.log('Pipe distance (front):', Units.formatInches(State.pipeDistanceFront, true));
+    console.log('Pipe distance (back):', Units.formatInches(State.pipeDistanceBack, true));
     console.log('Scale:', Renderer.scale.toFixed(2), 'pixels per inch');
     const inset = Layout.bracketInsetDepth();
     const gap = CONFIG.shelf.depth - 2 * inset - 2 * CONFIG.bracket.length;
     console.log('Bracket inset (depth):', Units.formatInches(inset, true));
     console.log('Bracket gap between (depth):', Units.formatInches(gap, true));
 
-    // Log clearance info
-    const shiftInfo = Layout.optimalShift();
-    console.log('Bracket shift:', Units.formatInches(shiftInfo.shift, true));
-    console.log('Min shift (button head):', Units.formatInches(shiftInfo.minShiftButtonHead, true));
-    console.log('Min shift (nut clearance):', Units.formatInches(shiftInfo.minShiftNut, true));
-    console.log('Max shift (inner holes):', Units.formatInches(shiftInfo.maxShift, true));
-    if (shiftInfo.hasConflict) {
+    // Log clearance info for both positions
+    const shiftInfoFront = Layout.optimalShift('bottom');
+    const shiftInfoBack = Layout.optimalShift('top');
+    console.log('Front bracket shift:', Units.formatInches(shiftInfoFront.shift, true));
+    console.log('Back bracket shift:', Units.formatInches(shiftInfoBack.shift, true));
+    console.log('Min shift (button head, front):', Units.formatInches(shiftInfoFront.minShiftButtonHead, true));
+    console.log('Min shift (button head, back):', Units.formatInches(shiftInfoBack.minShiftButtonHead, true));
+    console.log('Min shift (nut clearance):', Units.formatInches(shiftInfoFront.minShiftNut, true));
+    if (shiftInfoFront.hasConflict || shiftInfoBack.hasConflict) {
         console.warn('CONFLICT: Required min shift exceeds max allowed!');
-        console.warn(`Need ${Units.toMm(shiftInfo.minShift).toFixed(2)}mm, max allowed ${Units.toMm(shiftInfo.maxShift).toFixed(2)}mm`);
     }
 }

@@ -65,8 +65,15 @@ export const Renderer = {
     calculateDimensions() {
         const pipeRadius = CONFIG.pipe.diameter / 2;
 
-        // Total width = pipe distance + full diameter on each side (for the pipes extending outside)
-        const totalWidth = State.pipeDistance + CONFIG.pipe.diameter;
+        // Total width needs to encompass the full shelf and the widest pipe/bracket spread
+        const shelfHalfWidth = CONFIG.shelf.width / 2;
+        const shiftFront = Layout.optimalShift('bottom').shift;
+        const shiftBack = Layout.optimalShift('top').shift;
+        const bracketHalfWidth = CONFIG.bracket.width / 2;
+        const frontExtent = State.pipeDistanceFront / 2 + pipeRadius + shiftFront + bracketHalfWidth;
+        const backExtent = State.pipeDistanceBack / 2 + pipeRadius + shiftBack + bracketHalfWidth;
+        const halfSpan = Math.max(shelfHalfWidth, frontExtent, backExtent);
+        const totalWidth = halfSpan * 2;
 
         // Total height depends on view
         let totalHeight;
@@ -90,8 +97,8 @@ export const Renderer = {
         this.canvas.width = Math.round(totalWidth * this.scale + CONFIG.display.padding * 2);
         this.canvas.height = Math.round(totalHeight * this.scale + CONFIG.display.padding * 2);
 
-        // Offset so that x=0 is at the left pipe's inner edge
-        this.offsetX = CONFIG.display.padding + pipeRadius * this.scale;
+        // Center coordinate system on shelf midpoint (x = 0 at shelf center)
+        this.offsetX = CONFIG.display.padding + halfSpan * this.scale;
 
         if (State.view === 'top') {
             this.offsetY = CONFIG.display.padding + CONFIG.pipe.overhang * this.scale;
@@ -127,6 +134,18 @@ export const Renderer = {
      */
     toPixels(inches) {
         return Math.round(inches * this.scale);
+    },
+
+    /**
+     * Get the pipe center X coordinate in shelf-centered space
+     * @param {number} pipeDistance - inner-edge spacing for this depth position
+     * @param {boolean} isLeft
+     */
+    getPipeCenterX(pipeDistance, isLeft) {
+        const pipeRadius = CONFIG.pipe.diameter / 2;
+        return isLeft
+            ? -pipeDistance / 2 - pipeRadius
+            : pipeDistance / 2 + pipeRadius;
     },
 
     /**
@@ -187,49 +206,96 @@ export const Renderer = {
     },
 
     /**
-     * Draw a single pipe
-     * @param {number} xInnerEdge - X position of the pipe's inner edge in inches
+     * Draw a single angled pipe (parallelogram for right pipe when distances differ)
+     * The pipe maintains constant width (diameter) but tilts to show the angle.
+     * @param {boolean} isLeft - true for left pipe, false for right pipe
      */
-    drawPipe(xInnerEdge) {
+    drawAngledPipe(isLeft) {
+        const ctx = this.ctx;
         const pipeRadius = CONFIG.pipe.diameter / 2;
+        const pipeWidth = CONFIG.pipe.diameter;
 
-        // Pipe position: inner edge at xInnerEdge
-        const x = this.toPixelX(xInnerEdge - pipeRadius);
-        const y = this.toPixelY(-CONFIG.pipe.overhang);
-        const width = this.toPixels(CONFIG.pipe.diameter);
-        const height = this.toPixels(CONFIG.pipe.length);
+        // Y positions: top of view is back, bottom of view is front
+        const yTop = -CONFIG.pipe.overhang;  // Back
+        const yBottom = -CONFIG.pipe.overhang + CONFIG.pipe.length;  // Front
 
-        this.fillRect(x, y, width, height, CONFIG.colors.pipe);
-        this.strokeRect(x, y, width, height, CONFIG.colors.pipeStroke, 1);
+        // X positions for inner edge at front (bottom) and back (top) relative to shelf center
+        const frontInnerX = isLeft
+            ? -State.pipeDistanceFront / 2
+            : State.pipeDistanceFront / 2;
+        const backInnerX = isLeft
+            ? -State.pipeDistanceBack / 2
+            : State.pipeDistanceBack / 2;
+
+        const backOuterX = isLeft
+            ? backInnerX - CONFIG.pipe.diameter
+            : backInnerX + CONFIG.pipe.diameter;
+        const frontOuterX = isLeft
+            ? frontInnerX - CONFIG.pipe.diameter
+            : frontInnerX + CONFIG.pipe.diameter;
+
+        const topLeftX = this.toPixelX(isLeft ? backOuterX : backInnerX);
+        const topRightX = this.toPixelX(isLeft ? backInnerX : backOuterX);
+        const bottomLeftX = this.toPixelX(isLeft ? frontOuterX : frontInnerX);
+        const bottomRightX = this.toPixelX(isLeft ? frontInnerX : frontOuterX);
+        const topY = this.toPixelY(yTop);
+        const bottomY = this.toPixelY(yBottom);
+
+        // Draw as polygon (parallelogram)
+        ctx.beginPath();
+        ctx.moveTo(topLeftX, topY);
+        ctx.lineTo(topRightX, topY);
+        ctx.lineTo(bottomRightX, bottomY);
+        ctx.lineTo(bottomLeftX, bottomY);
+        ctx.closePath();
+
+        ctx.fillStyle = CONFIG.colors.pipe;
+        ctx.fill();
+        ctx.strokeStyle = CONFIG.colors.pipeStroke;
+        ctx.lineWidth = 1;
+        ctx.stroke();
     },
 
     /**
-     * Draw both pipe supports
+     * Draw both pipe supports (potentially angled)
      */
     drawPipes() {
-        // Left pipe: inner edge at x = 0
-        this.drawPipe(0);
-
-        // Right pipe: inner edge at x = pipeDistance
-        this.drawPipe(State.pipeDistance);
+        this.drawAngledPipe(true);   // Left pipe
+        this.drawAngledPipe(false);  // Right pipe
     },
 
     /**
-     * Draw center line on a pipe
-     * @param {number} xInnerEdge - X position of the pipe's inner edge in inches
+     * Draw center line on an angled pipe
+     * @param {boolean} isLeft - true for left pipe, false for right pipe
      */
-    drawPipeCenterLine(xInnerEdge) {
+    drawAngledPipeCenterLine(isLeft) {
         const ctx = this.ctx;
         const pipeRadius = CONFIG.pipe.diameter / 2;
 
-        // Center of pipe
-        const x = Math.round(this.toPixelX(xInnerEdge)) + 0.5; // 0.5 offset for crisp 1px line
-        const yStart = this.toPixelY(-CONFIG.pipe.overhang);
-        const yEnd = this.toPixelY(-CONFIG.pipe.overhang + CONFIG.pipe.length);
+        // Y positions
+        const yTop = -CONFIG.pipe.overhang;
+        const yBottom = -CONFIG.pipe.overhang + CONFIG.pipe.length;
+
+        // X positions for inner edge at front (bottom) and back (top)
+        const frontInnerX = isLeft
+            ? -State.pipeDistanceFront / 2
+            : State.pipeDistanceFront / 2;
+        const backInnerX = isLeft
+            ? -State.pipeDistanceBack / 2
+            : State.pipeDistanceBack / 2;
+
+        const frontCenterX = frontInnerX + (isLeft ? -pipeRadius : pipeRadius);
+        const backCenterX = backInnerX + (isLeft ? -pipeRadius : pipeRadius);
+
+        // Center line goes from back center to front center
+        const xStart = Math.round(this.toPixelX(backCenterX)) + 0.5;
+        const xEnd = Math.round(this.toPixelX(frontCenterX)) + 0.5;
+        const yStart = this.toPixelY(yTop);
+        const yEnd = this.toPixelY(yBottom);
 
         ctx.beginPath();
-        ctx.moveTo(x, yStart);
-        ctx.lineTo(x, yEnd);
+        ctx.moveTo(xStart, yStart);
+        ctx.lineTo(xEnd, yEnd);
         ctx.strokeStyle = '#ff0000';
         ctx.lineWidth = 1;
         ctx.stroke();
@@ -239,25 +305,22 @@ export const Renderer = {
      * Draw center lines on both pipes (top view)
      */
     drawPipeCenterLines() {
-        // Left pipe center line
-        this.drawPipeCenterLine(0);
-
-        // Right pipe center line
-        this.drawPipeCenterLine(State.pipeDistance);
+        this.drawAngledPipeCenterLine(true);   // Left pipe
+        this.drawAngledPipeCenterLine(false);  // Right pipe
     },
 
     // ========== FRONT VIEW METHODS ==========
 
     /**
      * Draw a pipe as a circle (front view)
-     * @param {number} xInnerEdge - X position of the pipe's inner edge in inches
+     * @param {number} xCenter - pipe center X coordinate in inches
      */
-    drawPipeCircle(xInnerEdge) {
+    drawPipeCircle(xCenter) {
         const ctx = this.ctx;
         const pipeRadius = CONFIG.pipe.diameter / 2;
 
         // Circle center
-        const cx = this.toPixelX(xInnerEdge);
+        const cx = this.toPixelX(xCenter);
         const cy = this.toPixelY(pipeRadius);
         const r = this.toPixels(pipeRadius);
 
@@ -272,21 +335,25 @@ export const Renderer = {
 
     /**
      * Draw both pipe circles (front view)
+     * Uses front pipe distance since this is the front view
      */
     drawPipeCircles() {
-        this.drawPipeCircle(0);
-        this.drawPipeCircle(State.pipeDistance);
+        const pipeRadius = CONFIG.pipe.diameter / 2;
+        const leftCenter = -State.pipeDistanceFront / 2 - pipeRadius;
+        const rightCenter = State.pipeDistanceFront / 2 + pipeRadius;
+        this.drawPipeCircle(leftCenter);
+        this.drawPipeCircle(rightCenter);
     },
 
     /**
      * Draw center line on a pipe circle (front view) - vertical line through center
-     * @param {number} xInnerEdge - X position of the pipe's inner edge in inches
+     * @param {number} xCenter - pipe center X coordinate in inches
      */
-    drawPipeCircleCenterLine(xInnerEdge) {
+    drawPipeCircleCenterLine(xCenter) {
         const ctx = this.ctx;
         const pipeRadius = CONFIG.pipe.diameter / 2;
 
-        const x = Math.round(this.toPixelX(xInnerEdge)) + 0.5;
+        const x = Math.round(this.toPixelX(xCenter)) + 0.5;
         const yStart = this.toPixelY(0);
         const yEnd = this.toPixelY(CONFIG.pipe.diameter);
 
@@ -300,21 +367,25 @@ export const Renderer = {
 
     /**
      * Draw center lines on both pipe circles (front view)
+     * Uses front pipe distance since this is the front view
      */
     drawPipeCircleCenterLines() {
-        this.drawPipeCircleCenterLine(0);
-        this.drawPipeCircleCenterLine(State.pipeDistance);
+        const pipeRadius = CONFIG.pipe.diameter / 2;
+        const leftCenter = -State.pipeDistanceFront / 2 - pipeRadius;
+        const rightCenter = State.pipeDistanceFront / 2 + pipeRadius;
+        this.drawPipeCircleCenterLine(leftCenter);
+        this.drawPipeCircleCenterLine(rightCenter);
     },
 
     /**
      * Draw shelf in front view (rectangle above pipes and brackets)
+     * Uses front pipe distance since this is the front view
      */
     drawShelfFront() {
         const ctx = this.ctx;
 
-        // Shelf is centered between pipes
-        const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
-        const shelfX = -shelfOverhang;
+        // Shelf is centered on origin (fixed rectangle)
+        const shelfX = -CONFIG.shelf.width / 2;
 
         const x = this.toPixelX(shelfX);
         // Shelf sits above the bracket (which is above the pipe)
@@ -341,25 +412,23 @@ export const Renderer = {
 
     /**
      * Draw a bracket in top view (rectangle with 4 holes)
-     * @param {number} xPipeInnerEdge - X position of the pipe's inner edge in inches
-     * @param {string} position - 'top' or 'bottom' edge of shelf
+     * @param {string} position - 'top' (back) or 'bottom' (front) edge of shelf
      * @param {boolean} isLeft - true for left pipe brackets, false for right
      */
-    drawBracketTop(xPipeInnerEdge, position, isLeft) {
+    drawBracketTop(position, isLeft) {
         const ctx = this.ctx;
         const b = CONFIG.bracket;
         const hw = CONFIG.hardware;
 
-        // Get optimal shift from Layout module (considers both shelf edge and nut clearance)
-        const shiftInfo = Layout.optimalShift();
+        const pipeDistance = position === 'top' ? State.pipeDistanceBack : State.pipeDistanceFront;
+        const pipeCenterX = this.getPipeCenterX(pipeDistance, isLeft);
+
+        // Get optimal shift from Layout module (position-specific for pipe distance)
+        const shiftInfo = Layout.optimalShift(position);
         const shift = shiftInfo.shift;
 
         let bracketCenterX;
-        if (isLeft) {
-            bracketCenterX = xPipeInnerEdge - shift;  // Shift left
-        } else {
-            bracketCenterX = xPipeInnerEdge + shift;  // Shift right
-        }
+        bracketCenterX = pipeCenterX + (isLeft ? -shift : shift);
         const bracketX = bracketCenterX - b.width / 2;
 
         // Bracket is fully under the shelf, positioned along depth
@@ -425,35 +494,34 @@ export const Renderer = {
 
     /**
      * Draw all 4 brackets in top view (2 per pipe)
+     * Top (back) brackets use pipeDistanceBack
+     * Bottom (front) brackets use pipeDistanceFront
      */
     drawBracketsTop() {
-        // Left pipe brackets
-        this.drawBracketTop(0, 'top', true);
-        this.drawBracketTop(0, 'bottom', true);
-        // Right pipe brackets
-        this.drawBracketTop(State.pipeDistance, 'top', false);
-        this.drawBracketTop(State.pipeDistance, 'bottom', false);
+        // Back (top) brackets
+        this.drawBracketTop('top', true);
+        this.drawBracketTop('top', false);
+        // Front (bottom) brackets
+        this.drawBracketTop('bottom', true);
+        this.drawBracketTop('bottom', false);
     },
 
     /**
      * Draw a bracket in front view (thin rectangle on top of pipe)
-     * @param {number} xPipeInnerEdge - X position of the pipe's inner edge in inches
+     * Uses front position calculations since this is the front view
      * @param {boolean} isLeft - true for left pipe bracket, false for right
      */
-    drawBracketFront(xPipeInnerEdge, isLeft) {
+    drawBracketFront(isLeft) {
         const ctx = this.ctx;
         const b = CONFIG.bracket;
+        const pipeDistance = State.pipeDistanceFront;
+        const pipeCenterX = this.getPipeCenterX(pipeDistance, isLeft);
 
-        // Get optimal shift from Layout module (same as top view)
-        const shiftInfo = Layout.optimalShift();
+        // Get optimal shift for front (bottom) position
+        const shiftInfo = Layout.optimalShift('bottom');
         const shift = shiftInfo.shift;
 
-        let bracketCenterX;
-        if (isLeft) {
-            bracketCenterX = xPipeInnerEdge - shift;
-        } else {
-            bracketCenterX = xPipeInnerEdge + shift;
-        }
+        const bracketCenterX = pipeCenterX + (isLeft ? -shift : shift);
         const bracketX = bracketCenterX - b.width / 2;
 
         const x = this.toPixelX(bracketX);
@@ -467,24 +535,20 @@ export const Renderer = {
 
     /**
      * Draw button screw head in front view (showing it must clear shelf)
-     * @param {number} xPipeInnerEdge - X position of pipe center in inches
+     * Uses front position calculations since this is the front view
      * @param {boolean} isLeft - true for left pipe bracket, false for right
      */
-    drawButtonScrewFront(xPipeInnerEdge, isLeft) {
+    drawButtonScrewFront(isLeft) {
         const ctx = this.ctx;
         const b = CONFIG.bracket;
         const hw = CONFIG.hardware;
 
-        // Get optimal shift from Layout module
-        const shiftInfo = Layout.optimalShift();
+        // Get optimal shift for front (bottom) position
+        const shiftInfo = Layout.optimalShift('bottom');
         const shift = shiftInfo.shift;
+        const pipeCenterX = this.getPipeCenterX(State.pipeDistanceFront, isLeft);
 
-        let bracketCenterX;
-        if (isLeft) {
-            bracketCenterX = xPipeInnerEdge - shift;
-        } else {
-            bracketCenterX = xPipeInnerEdge + shift;
-        }
+        const bracketCenterX = pipeCenterX + (isLeft ? -shift : shift);
         const bracketX = bracketCenterX - b.width / 2;
 
         // Outer hole X position
@@ -520,24 +584,20 @@ export const Renderer = {
 
     /**
      * Draw hex cap nuts hanging below bracket in front view
-     * @param {number} xPipeInnerEdge - X position of pipe center in inches
+     * Uses front position calculations since this is the front view
      * @param {boolean} isLeft - true for left pipe bracket, false for right
      */
-    drawHexNutsFront(xPipeInnerEdge, isLeft) {
+    drawHexNutsFront(isLeft) {
         const ctx = this.ctx;
         const b = CONFIG.bracket;
         const hw = CONFIG.hardware;
 
-        // Get optimal shift from Layout module
-        const shiftInfo = Layout.optimalShift();
+        // Get optimal shift for front (bottom) position
+        const shiftInfo = Layout.optimalShift('bottom');
         const shift = shiftInfo.shift;
+        const pipeCenterX = this.getPipeCenterX(State.pipeDistanceFront, isLeft);
 
-        let bracketCenterX;
-        if (isLeft) {
-            bracketCenterX = xPipeInnerEdge - shift;
-        } else {
-            bracketCenterX = xPipeInnerEdge + shift;
-        }
+        const bracketCenterX = pipeCenterX + (isLeft ? -shift : shift);
         const bracketX = bracketCenterX - b.width / 2;
 
         // Outer hole X position (where nut hangs)
@@ -601,30 +661,28 @@ export const Renderer = {
 
     /**
      * Draw both brackets in front view
+     * Uses front pipe distance since this is the front view
      */
     drawBracketsFront() {
-        this.drawBracketFront(0, true);
-        this.drawBracketFront(State.pipeDistance, false);
+        this.drawBracketFront(true);
+        this.drawBracketFront(false);
         // Draw button screw heads on top of brackets
-        this.drawButtonScrewFront(0, true);
-        this.drawButtonScrewFront(State.pipeDistance, false);
+        this.drawButtonScrewFront(true);
+        this.drawButtonScrewFront(false);
         // Draw hex nuts hanging below brackets
-        this.drawHexNutsFront(0, true);
-        this.drawHexNutsFront(State.pipeDistance, false);
+        this.drawHexNutsFront(true);
+        this.drawHexNutsFront(false);
     },
 
     /**
-     * Draw the main shelf rectangle (centered between pipes)
+     * Draw the main shelf rectangle (fixed 30" width)
+     * The shelf stays centered on the origin; only the pipes move/angle.
      */
     drawShelf() {
         const ctx = this.ctx;
 
-        // Shelf is centered between pipes
-        // shelfOverhang = how much shelf extends beyond each pipe's inner edge
-        const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
-
-        // Shelf left edge position (negative means it extends past left pipe's inner edge)
-        const shelfX = -shelfOverhang;
+        // Shelf is centered on origin (fixed rectangle regardless of pipe angles)
+        const shelfX = -CONFIG.shelf.width / 2;
 
         const x = this.toPixelX(shelfX);
         const y = this.toPixelY(0);
@@ -666,4 +724,3 @@ export const Renderer = {
         }
     }
 };
-

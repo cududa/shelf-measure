@@ -9,26 +9,46 @@ export const Template = {
     pageHeight: 11,
 
     /**
-     * Generate the complete SVG template
-     * @returns {string} SVG markup
+     * Generate both SVG templates (front and back)
+     * @returns {object} { front: string, back: string } SVG markup for both pages
      */
     generateSVG() {
+        return {
+            front: this.generatePage('front'),
+            back: this.generatePage('back')
+        };
+    },
+
+    /**
+     * Generate a single template page
+     * @param {string} type - 'front' or 'back'
+     * @returns {string} SVG markup
+     */
+    generatePage(type) {
         const b = CONFIG.bracket;
-        const shiftInfo = Layout.optimalShift();
+        const position = type === 'front' ? 'bottom' : 'top';
+        const pipeDistance = type === 'front' ? State.pipeDistanceFront : State.pipeDistanceBack;
+
+        const shiftInfo = Layout.optimalShift(position);
         const shift = shiftInfo.shift;
-        const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
+        const shelfOverhang = (CONFIG.shelf.width - pipeDistance) / 2;
         const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
-        const bracketTopInset = Layout.bracketYTopView('top');
+        // For template, use inset from the relevant edge (both front and back use the same small inset value)
+        const bracketTopInset = Layout.bracketInsetDepth();
 
         // Key measurements
         const bracketEdgeFromShelfEdge = shift + b.width / 2 - shelfOverhang;
         const innerHoleFromShelfEdge = shelfOverhang - shift + holeCenterFromBracketCenter;
+        const clearanceInfo = Layout.nutToPipeClearance(true, shift, position);
+        const nutClearance = clearanceInfo.clearance;
 
         // Use 72 DPI for coordinate system (standard print DPI)
         // This gives us 612 x 792 pixels for 8.5" x 11"
         const dpi = 72;
         const pageWidthPx = this.pageWidth * dpi;
         const pageHeightPx = this.pageHeight * dpi;
+
+        const typeLabel = type === 'front' ? 'FRONT' : 'BACK';
 
         let svg = `<svg xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 ${pageWidthPx} ${pageHeightPx}"
@@ -51,10 +71,10 @@ export const Template = {
         // Add 1" scale reference square (convert inches to pixels) near top-left margin
         svg += this.drawScaleReference(pageWidthPx - 1.8 * dpi, pageHeightPx - 1.8 * dpi, dpi);
 
-        // Add title and pipe distance
+        // Add title with front/back designation
         const shelfLabel = State.shelfNumber ? `Shelf ${State.shelfNumber} ` : '';
-        svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi}" class="label" text-anchor="middle" style="font-size: 14px;">${shelfLabel}Bracket Drilling Template</text>`;
-        svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi + 16}" class="label" text-anchor="middle" style="font-size: 11px;">Pipe Distance: ${State.pipeDistance}, ${Units.formatWithFraction(State.pipeDistance)}</text>`;
+        svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi}" class="label" text-anchor="middle" style="font-size: 14px;">${shelfLabel}${typeLabel} Bracket Drilling Template</text>`;
+        svg += `<text x="${pageWidthPx / 2}" y="${0.5 * dpi + 16}" class="label" text-anchor="middle" style="font-size: 11px;">${typeLabel} Pipe Distance: ${pipeDistance.toFixed(5)}", ${Units.formatWithFraction(pipeDistance)}</text>`;
 
         const templateCenterX = pageWidthPx / 2;
         const templateOffsetX = 3.2 * dpi;
@@ -67,10 +87,18 @@ export const Template = {
         svg += this.drawCornerTemplate(true, templateCenterX + templateOffsetX, templateY, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, bracketTopInset, dpi);
 
         // Add measurements info at bottom
-        svg += this.drawMeasurementsInfo(bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, dpi, pageWidthPx);
+        svg += this.drawMeasurementsInfo(
+            bracketEdgeFromShelfEdge,
+            innerHoleFromShelfEdge,
+            dpi,
+            pageWidthPx,
+            type,
+            pipeDistance,
+            nutClearance
+        );
 
         // Add usage instructions
-        svg += this.drawInstructions(dpi, pageWidthPx);
+        svg += this.drawInstructions(dpi, pageWidthPx, type);
 
         svg += '</svg>';
         return svg;
@@ -118,9 +146,10 @@ export const Template = {
         const holeBottomPx = b.holes.bottom * dpi;
         const bracketEdgePx = bracketEdge * dpi;
 
-        // Ensure the board preview extends past the bracket
+        // Ensure the board preview extends past the bracket, but cap to fit on page
         const minBoardDepthPx = bracketInsetPx + bracketLengthPx + dpi * 0.5;
-        const boardVerticalPreview = Math.max(3 * dpi, minBoardDepthPx);
+        const maxBoardDepthPx = 5 * dpi;  // Max 5 inches to fit on letter page
+        const boardVerticalPreview = Math.min(maxBoardDepthPx, Math.max(3 * dpi, minBoardDepthPx));
 
         let g = `<g id="${isRight ? 'right' : 'left'}-corner" transform="translate(${x}, ${y})">`;
 
@@ -200,16 +229,25 @@ export const Template = {
      * @param {number} innerHole - Inner hole distance in inches
      * @param {number} dpi - Dots per inch
      * @param {number} pageWidthPx - Page width in pixels
+     * @param {string} type - 'front' or 'back'
+     * @param {number} pipeDistance - Pipe distance for this template
+     * @param {number} nutClearance - Actual nut clearance in inches (signed)
      */
-    drawMeasurementsInfo(bracketEdge, innerHole, dpi, pageWidthPx) {
+    drawMeasurementsInfo(bracketEdge, innerHole, dpi, pageWidthPx, type, pipeDistance, nutClearance) {
         const y = 7.5 * dpi;
         const centerX = pageWidthPx / 2;
+        const typeLabel = type === 'front' ? 'FRONT' : 'BACK';
+        const clearanceMm = Units.toMm(Math.abs(nutClearance)).toFixed(2);
+        const targetMm = Units.toMm(State.nutPipeClearance).toFixed(2);
+        const clearanceLabel = nutClearance >= 0
+            ? `${clearanceMm}mm`
+            : `OVERLAP ${clearanceMm}mm`;
         return `
             <g id="measurements">
-                <text x="${centerX}" y="${y}" class="label" text-anchor="middle">Key Measurements</text>
+                <text x="${centerX}" y="${y}" class="label" text-anchor="middle">${typeLabel} Key Measurements</text>
                 <text x="${centerX}" y="${y + 18}" class="info-text" text-anchor="middle">Bracket outer edge from shelf edge: ${Units.formatWithFraction(bracketEdge)}</text>
                 <text x="${centerX}" y="${y + 32}" class="info-text" text-anchor="middle">Inner drill hole from shelf edge: ${Units.formatWithFraction(innerHole)}</text>
-                <text x="${centerX}" y="${y + 46}" class="info-text" text-anchor="middle">Pipe Distance: ${State.pipeDistance.toFixed(5)}" | Nut-Pipe Gap: ${(State.nutPipeClearance * 25.4).toFixed(2)}mm</text>
+                <text x="${centerX}" y="${y + 46}" class="info-text" text-anchor="middle">${typeLabel} Pipe Distance: ${pipeDistance.toFixed(5)}" | Nut-Pipe Clearance: ${clearanceLabel} (target ${targetMm}mm)</text>
             </g>`;
     },
 
@@ -217,25 +255,39 @@ export const Template = {
      * Draw usage instructions
      * @param {number} dpi - Dots per inch
      * @param {number} pageWidthPx - Page width in pixels
+     * @param {string} type - 'front' or 'back'
      */
-    drawInstructions(dpi, pageWidthPx) {
+    drawInstructions(dpi, pageWidthPx, type) {
         const y = 8.8 * dpi;
         const centerX = pageWidthPx / 2;
+        const typeLabel = type === 'front' ? 'FRONT' : 'BACK';
+        const edgeDesc = type === 'front' ? 'FRONT' : 'BACK';
         return `
             <g id="instructions">
-                <text x="${centerX}" y="${y}" class="label" text-anchor="middle">Instructions</text>
+                <text x="${centerX}" y="${y}" class="label" text-anchor="middle">Instructions - ${typeLabel} Template</text>
                 <text x="${centerX}" y="${y + 16}" class="info-text" text-anchor="middle">1. Print at 100% scale (no fit-to-page) - measure the 1" square to verify</text>
-                <text x="${centerX}" y="${y + 30}" class="info-text" text-anchor="middle">2. Align corner mark with shelf corner, use LEFT for left corners, RIGHT for right corners</text>
-                <text x="${centerX}" y="${y + 44}" class="info-text" text-anchor="middle">3. Mark drill hole centers through the crosshairs</text>
-                <text x="${centerX}" y="${y + 58}" class="info-text" text-anchor="middle">4. Flip paper 180° to mark bottom corners (same left/right orientation)</text>
+                <text x="${centerX}" y="${y + 30}" class="info-text" text-anchor="middle">2. Align corner mark with the ${edgeDesc} edge corners of the shelf</text>
+                <text x="${centerX}" y="${y + 44}" class="info-text" text-anchor="middle">3. Use LEFT template for left corners, RIGHT template for right corners</text>
+                <text x="${centerX}" y="${y + 58}" class="info-text" text-anchor="middle">4. Mark drill hole centers through the crosshairs</text>
             </g>`;
     },
 
     /**
-     * Render the template to the container
+     * Render both templates to the container for printing
+     * Uses CSS page-break to separate them into two printed pages
      */
     render() {
         const container = document.getElementById('template-container');
-        container.innerHTML = this.generateSVG();
+        const templates = this.generateSVG();
+
+        // Create wrapper divs for each page with page-break between them
+        container.innerHTML = `
+            <div class="template-page template-page-front">
+                ${templates.front}
+            </div>
+            <div class="template-page template-page-back">
+                ${templates.back}
+            </div>
+        `;
     }
 };
