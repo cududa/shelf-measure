@@ -82,6 +82,56 @@
                 height: 11in !important;
                 max-width: none !important;
             }
+            #favorites-section {
+                display: none !important;
+            }
+        }
+        #favorites-table-container table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            background: #fff;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        #favorites-table-container th,
+        #favorites-table-container td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        #favorites-table-container th {
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #333;
+        }
+        #favorites-table-container tr:hover {
+            background: #fafafa;
+        }
+        #favorites-table-container .load-btn,
+        #favorites-table-container .delete-btn {
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 4px;
+        }
+        #favorites-table-container .load-btn {
+            color: #1976d2;
+            border-color: #1976d2;
+        }
+        #favorites-table-container .load-btn:hover {
+            background: #e3f2fd;
+        }
+        #favorites-table-container .delete-btn {
+            color: #c62828;
+            border-color: #c62828;
+        }
+        #favorites-table-container .delete-btn:hover {
+            background: #ffebee;
         }
     </style>
 </head>
@@ -108,10 +158,15 @@
         <span>mm</span>
         <button id="view-toggle" style="margin-left: 20px; padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer;">View: Top</button>
         <button id="export-template" style="padding: 6px 12px; border: 1px solid #2e7d32; border-radius: 4px; background: #fff; cursor: pointer; color: #2e7d32;">Export Template</button>
+        <button id="save-favorite" style="padding: 6px 12px; border: 1px solid #f9a825; border-radius: 4px; background: #fff; cursor: pointer; color: #f9a825; font-size: 16px;" title="Save to favorites">★</button>
     </div>
     <div id="clearance-info" style="margin-top: 10px; font-size: 12px; display: flex; gap: 20px;">
         <span id="clearance-left">Nut clearance (L): --</span>
         <span id="clearance-right">Nut clearance (R): --</span>
+    </div>
+    <div id="favorites-section" style="margin-top: 20px; width: 100%; max-width: 800px;">
+        <h3 style="font-size: 14px; margin-bottom: 10px; color: #333;">Saved Configurations</h3>
+        <div id="favorites-table-container"></div>
     </div>
 
         <script type="module" src="./src/main.js"></script>

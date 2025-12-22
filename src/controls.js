@@ -4,6 +4,7 @@ import { Renderer } from './renderer.js';
 import { Layout } from './layout.js';
 import { Units } from './units.js';
 import { exportTemplate, exportSVG } from './exporter.js';
+import { Favorites } from './favorites.js';
 
 export const Controls = {
     init() {
@@ -31,10 +32,10 @@ export const Controls = {
             const valueMm = parseFloat(e.target.value);
             if (!isNaN(valueMm) && valueMm >= 0) {
                 State.nutPipeClearance = valueMm / 25.4;  // Convert mm to inches
+                Renderer.calculateDimensions();
                 Renderer.render();
                 this.updateClearanceDisplay();
 
-                // Warn if gap is too small (< 1.0mm recommended minimum)
                 if (valueMm < 1.0) {
                     nutClearanceInput.style.borderColor = '#c62828';
                     nutClearanceInput.style.backgroundColor = '#ffebee';
@@ -76,6 +77,25 @@ export const Controls = {
                 exportBtn.textContent = originalText;
             }
         });
+
+        // Save favorite button
+        const saveFavoriteBtn = document.getElementById('save-favorite');
+        saveFavoriteBtn.addEventListener('click', () => {
+            Favorites.save();
+        });
+
+        // Listen for favorites being loaded to update UI
+        window.addEventListener('favorites-loaded', () => {
+            shelfNumberInput.value = State.shelfNumber;
+            pipeDistanceInput.value = State.pipeDistance;
+            nutClearanceInput.value = (State.nutPipeClearance * 25.4).toFixed(1);
+            Renderer.calculateDimensions();
+            Renderer.render();
+            this.updateClearanceDisplay();
+        });
+
+        // Initialize favorites table
+        Favorites.init();
     },
 
     /**
