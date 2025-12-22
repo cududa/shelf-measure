@@ -63,10 +63,10 @@ export const Template = {
         const templateY = 1.6 * dpi;
 
         // Left corner template (positioned symmetrically about center)
-        svg += this.drawCornerTemplate(false, templateCenterX - templateOffsetX, templateY, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, bracketTopInset, dpi);
+        svg += this.drawCornerTemplate(false, templateCenterX - templateOffsetX, templateY, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, bracketTopInset, dpi, pageWidthPx);
 
         // Right corner template
-        svg += this.drawCornerTemplate(true, templateCenterX + templateOffsetX, templateY, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, bracketTopInset, dpi);
+        svg += this.drawCornerTemplate(true, templateCenterX + templateOffsetX, templateY, bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, bracketTopInset, dpi, pageWidthPx);
 
         // Add measurements info at bottom
         svg += this.drawMeasurementsInfo(bracketEdgeFromShelfEdge, innerHoleFromShelfEdge, dpi, pageWidthPx);
@@ -102,8 +102,9 @@ export const Template = {
      * @param {number} innerHole - distance from shelf edge to inner hole center (inches)
      * @param {number} bracketInset - distance from shelf top edge to bracket top (inches)
      * @param {number} dpi - Dots per inch for conversion
+     * @param {number} pageWidthPx - Page width in pixels (for label bounds checking)
      */
-    drawCornerTemplate(isRight, x, y, bracketEdge, innerHole, bracketInset, dpi) {
+    drawCornerTemplate(isRight, x, y, bracketEdge, innerHole, bracketInset, dpi, pageWidthPx = 612) {
         const b = CONFIG.bracket;
         const interiorDir = isRight ? -1 : 1;
         const boardHorizontalPreview = 3 * dpi;
@@ -159,7 +160,7 @@ export const Template = {
         // Draw dimension line from shelf edge to bracket outer edge
         const dimY = bracketY + bracketLengthPx + 35;
         const dimensionEndX = isRight ? bracketEdgePx : -bracketEdgePx;
-        g += this.drawDimension(0, dimY, dimensionEndX, dimY, Units.formatWithFraction(bracketEdge), 14);
+        g += this.drawDimension(0, dimY, dimensionEndX, dimY, Units.formatWithFraction(bracketEdge), 14, x, pageWidthPx);
 
         g += '</g>';
         return g;
@@ -183,17 +184,49 @@ export const Template = {
 
     /**
      * Draw a dimension line with label
-     * All coordinates in pixels
+     * All coordinates in pixels (relative to parent group)
+     * @param {number} x1 - Start X
+     * @param {number} y1 - Start Y
+     * @param {number} x2 - End X
+     * @param {number} y2 - End Y
+     * @param {string} label - Text label
+     * @param {number} textOffset - Y offset for text below line
+     * @param {number} parentX - Parent group's X position on page (for bounds checking)
+     * @param {number} pageWidthPx - Page width in pixels
+     * @param {number} pageMargin - Minimum margin from page edge
      */
-    drawDimension(x1, y1, x2, y2, label, textOffset) {
+    drawDimension(x1, y1, x2, y2, label, textOffset, parentX = 0, pageWidthPx = 612, pageMargin = 10) {
         const midX = (x1 + x2) / 2;
         const midY = (y1 + y2) / 2;
+
+        // Calculate absolute position of the label center on the page
+        const absoluteMidX = parentX + midX;
+
+        // Estimate text width (roughly 5.5px per character for 9px font)
+        const estimatedTextWidth = label.length * 5.5;
+        const textHalfWidth = estimatedTextWidth / 2;
+
+        // Check if label would extend off page edges
+        let labelX = midX;
+        let textAnchor = 'middle';
+
+        if (absoluteMidX - textHalfWidth < pageMargin) {
+            // Label extends off left edge - anchor to start and position at left bound
+            const minX = pageMargin - parentX;
+            labelX = Math.max(minX, Math.min(x1, x2));
+            textAnchor = 'start';
+        } else if (absoluteMidX + textHalfWidth > pageWidthPx - pageMargin) {
+            // Label extends off right edge - anchor to end and position at right bound
+            const maxX = pageWidthPx - pageMargin - parentX;
+            labelX = Math.min(maxX, Math.max(x1, x2));
+            textAnchor = 'end';
+        }
 
         return `
             <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="dimension-line"/>
             <line x1="${x1}" y1="${y1 - 4}" x2="${x1}" y2="${y1 + 4}" class="dimension-line"/>
             <line x1="${x2}" y1="${y2 - 4}" x2="${x2}" y2="${y2 + 4}" class="dimension-line"/>
-            <text x="${midX}" y="${midY + textOffset}" class="dimension-text" text-anchor="middle">${label}</text>`;
+            <text x="${labelX}" y="${midY + textOffset}" class="dimension-text" text-anchor="${textAnchor}">${label}</text>`;
     },
 
     /**

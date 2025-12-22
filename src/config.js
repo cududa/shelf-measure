@@ -36,8 +36,8 @@ export const CONFIG = {
         },
         // Clearance requirements
         nutPipeClearance: {
-            target: 1 / 25.4,            // Target gap: 1mm
-            minimum: 1.0 / 25.4          // Minimum acceptable: 1.0mm
+            target: 0.25 / 25.4,         // Target gap: 0.25mm
+            minimum: 0.25 / 25.4         // Minimum acceptable: 0.25mm
         }
     },
     precision: 5,

@@ -36,10 +36,10 @@ export const Controls = {
                 Renderer.render();
                 this.updateClearanceDisplay();
 
-                if (valueMm < 1.0) {
+                if (valueMm < 0.25) {
                     nutClearanceInput.style.borderColor = '#c62828';
                     nutClearanceInput.style.backgroundColor = '#ffebee';
-                    nutClearanceInput.title = 'Warning: Gap below 1.0mm recommended minimum';
+                    nutClearanceInput.title = 'Warning: Gap below 0.25mm recommended minimum';
                 } else {
                     nutClearanceInput.style.borderColor = '';
                     nutClearanceInput.style.backgroundColor = '';
@@ -88,7 +88,7 @@ export const Controls = {
         window.addEventListener('favorites-loaded', () => {
             shelfNumberInput.value = State.shelfNumber;
             pipeDistanceInput.value = State.pipeDistance;
-            nutClearanceInput.value = (State.nutPipeClearance * 25.4).toFixed(1);
+            nutClearanceInput.value = (State.nutPipeClearance * 25.4).toFixed(2);
             Renderer.calculateDimensions();
             Renderer.render();
             this.updateClearanceDisplay();
@@ -135,7 +135,9 @@ export const Controls = {
      */
     updatePlacementGuide(shift) {
         const b = CONFIG.bracket;
-        const shelfOverhang = (CONFIG.shelf.width - State.pipeDistance) / 2;
+        // pipeDistance is inside-to-inside, so center-to-center = pipeDistance + diameter
+        const pipeCenterToCenter = State.pipeDistance + CONFIG.pipe.diameter;
+        const shelfOverhang = (CONFIG.shelf.width - pipeCenterToCenter) / 2;
         const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
 
         // Distance from shelf edge to bracket outer edge

@@ -73,7 +73,7 @@ export const Favorites = {
                     <tr data-id="${f.id}">
                         <td>${f.shelfNumber || '-'}</td>
                         <td>${f.pipeDistance.toFixed(5)}</td>
-                        <td>${(f.nutPipeClearance * 25.4).toFixed(1)}</td>
+                        <td>${(f.nutPipeClearance * 25.4).toFixed(2)}</td>
                         <td>
                             <button class="load-btn" data-id="${f.id}">Load</button>
                             <button class="delete-btn" data-id="${f.id}">Delete</button>
