@@ -154,8 +154,11 @@
         <input type="number" id="pipe-distance" step="0.00001" value="28.96875">
         <span>inches</span>
         <label for="nut-clearance" style="margin-left: 20px;">Nut-Pipe Gap:</label>
-        <input type="number" id="nut-clearance" step="0.05" value="0.25" style="width: 60px;">
+        <input type="number" id="nut-clearance" step="0.05" value="0" min="0" style="width: 60px;">
         <span>mm</span>
+        <label for="subtract-value" style="margin-left: 20px;">Subtract:</label>
+        <input type="text" id="subtract-value" value="0" placeholder="0, 3/32, etc." style="width: 70px;">
+        <button id="subtract-unit-toggle" style="padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; min-width: 32px;">in</button>
         <button id="view-toggle" style="margin-left: 20px; padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer;">View: Top</button>
         <button id="open-template" style="padding: 6px 12px; border: 1px solid #2e7d32; border-radius: 4px; background: #fff; cursor: pointer; color: #2e7d32;" title="Open in new tab">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">

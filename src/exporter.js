@@ -98,7 +98,9 @@ export async function exportAllToNewTab(configs) {
     const originalState = {
         shelfNumber: State.shelfNumber,
         pipeDistance: State.pipeDistance,
-        nutPipeClearance: State.nutPipeClearance
+        nutPipeClearance: State.nutPipeClearance,
+        subtractValue: State.subtractValue,
+        subtractUnit: State.subtractUnit
     };
 
     for (let i = 0; i < configs.length; i++) {
@@ -108,6 +110,8 @@ export async function exportAllToNewTab(configs) {
         State.shelfNumber = config.shelfNumber || '';
         State.pipeDistance = config.pipeDistance;
         State.nutPipeClearance = config.nutPipeClearance;
+        State.subtractValue = config.subtractValue || 0;
+        State.subtractUnit = config.subtractUnit || 'in';
 
         // Generate SVG for this config
         const svg = Template.generateSVG();
@@ -132,6 +136,8 @@ export async function exportAllToNewTab(configs) {
     State.shelfNumber = originalState.shelfNumber;
     State.pipeDistance = originalState.pipeDistance;
     State.nutPipeClearance = originalState.nutPipeClearance;
+    State.subtractValue = originalState.subtractValue;
+    State.subtractUnit = originalState.subtractUnit;
 
     // Open PDF in new tab
     const pdfBlob = pdf.output('blob');

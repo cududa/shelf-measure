@@ -37,16 +37,47 @@ export const Controls = {
                 Renderer.render();
                 this.updateClearanceDisplay();
 
-                if (valueMm < 0.25) {
+                if (valueMm < 0) {
                     nutClearanceInput.style.borderColor = '#c62828';
                     nutClearanceInput.style.backgroundColor = '#ffebee';
-                    nutClearanceInput.title = 'Warning: Gap below 0.25mm recommended minimum';
+                    nutClearanceInput.title = 'Warning: Gap cannot be negative';
                 } else {
                     nutClearanceInput.style.borderColor = '';
                     nutClearanceInput.style.backgroundColor = '';
                     nutClearanceInput.title = '';
                 }
             }
+        });
+
+        // Subtract value input (for tolerance adjustment)
+        const subtractInput = document.getElementById('subtract-value');
+        const subtractUnitBtn = document.getElementById('subtract-unit-toggle');
+
+        subtractInput.addEventListener('input', (e) => {
+            const value = Units.parseFractionOrDecimal(e.target.value);
+            if (!isNaN(value)) {
+                State.subtractValue = value;
+                Renderer.calculateDimensions();
+                Renderer.render();
+                this.updateClearanceDisplay();
+            }
+        });
+
+        subtractUnitBtn.addEventListener('click', () => {
+            const currentValue = State.subtractValue;
+            if (State.subtractUnit === 'in') {
+                // Convert inches to mm
+                State.subtractUnit = 'mm';
+                State.subtractValue = currentValue * 25.4;
+                subtractUnitBtn.textContent = 'mm';
+            } else {
+                // Convert mm to inches
+                State.subtractUnit = 'in';
+                State.subtractValue = currentValue / 25.4;
+                subtractUnitBtn.textContent = 'in';
+            }
+            // Update displayed value
+            subtractInput.value = State.subtractValue === 0 ? '0' : State.subtractValue.toFixed(State.subtractUnit === 'mm' ? 2 : 5);
         });
 
         viewToggleBtn.addEventListener('click', () => {
@@ -98,6 +129,8 @@ export const Controls = {
             shelfNumberInput.value = State.shelfNumber;
             pipeDistanceInput.value = State.pipeDistance;
             nutClearanceInput.value = (State.nutPipeClearance * 25.4).toFixed(2);
+            subtractInput.value = State.subtractValue === 0 ? '0' : State.subtractValue.toFixed(State.subtractUnit === 'mm' ? 2 : 5);
+            subtractUnitBtn.textContent = State.subtractUnit;
             Renderer.calculateDimensions();
             Renderer.render();
             this.updateClearanceDisplay();

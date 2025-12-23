@@ -24,6 +24,8 @@ export const Favorites = {
             shelfNumber: State.shelfNumber,
             pipeDistance: State.pipeDistance,
             nutPipeClearance: State.nutPipeClearance,
+            subtractValue: State.subtractValue,
+            subtractUnit: State.subtractUnit,
             createdAt: new Date().toISOString()
         };
         favorites.push(entry);
@@ -45,6 +47,8 @@ export const Favorites = {
             State.shelfNumber = entry.shelfNumber || '';
             State.pipeDistance = entry.pipeDistance;
             State.nutPipeClearance = entry.nutPipeClearance;
+            State.subtractValue = entry.subtractValue || 0;
+            State.subtractUnit = entry.subtractUnit || 'in';
             return entry;
         }
         return null;
@@ -73,21 +77,27 @@ export const Favorites = {
                     <th>Shelf #</th>
                     <th>Pipe Distance (in)</th>
                     <th>Nut Gap (mm)</th>
+                    <th>Subtract</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                ${favorites.map(f => `
+                ${favorites.map(f => {
+                    const subtractVal = f.subtractValue || 0;
+                    const subtractUnit = f.subtractUnit || 'in';
+                    const subtractDisplay = subtractVal === 0 ? '0' : `${subtractVal.toFixed(subtractUnit === 'mm' ? 2 : 5)} ${subtractUnit}`;
+                    return `
                     <tr data-id="${f.id}">
                         <td>${f.shelfNumber || '-'}</td>
                         <td>${f.pipeDistance.toFixed(5)}</td>
                         <td>${(f.nutPipeClearance * 25.4).toFixed(2)}</td>
+                        <td>${subtractDisplay}</td>
                         <td>
                             <button class="load-btn" data-id="${f.id}">Load</button>
                             <button class="delete-btn" data-id="${f.id}">Delete</button>
                         </td>
                     </tr>
-                `).join('')}
+                `}).join('')}
             </tbody>
         `;
 
@@ -151,13 +161,17 @@ export const Favorites = {
             const originalState = {
                 shelfNumber: State.shelfNumber,
                 pipeDistance: State.pipeDistance,
-                nutPipeClearance: State.nutPipeClearance
+                nutPipeClearance: State.nutPipeClearance,
+                subtractValue: State.subtractValue,
+                subtractUnit: State.subtractUnit
             };
 
             for (const entry of favorites) {
                 State.shelfNumber = entry.shelfNumber || '';
                 State.pipeDistance = entry.pipeDistance;
                 State.nutPipeClearance = entry.nutPipeClearance;
+                State.subtractValue = entry.subtractValue || 0;
+                State.subtractUnit = entry.subtractUnit || 'in';
 
                 try {
                     await downloadTemplate();
@@ -171,6 +185,8 @@ export const Favorites = {
             State.shelfNumber = originalState.shelfNumber;
             State.pipeDistance = originalState.pipeDistance;
             State.nutPipeClearance = originalState.nutPipeClearance;
+            State.subtractValue = originalState.subtractValue;
+            State.subtractUnit = originalState.subtractUnit;
         } else {
             // Open single multi-page PDF in new tab
             await exportAllToNewTab(favorites);

@@ -27,18 +27,6 @@ export const Layout = {
         return depth - inset - L;
     },
 
-    minShiftForButtonHeadClearance() {
-        const b = CONFIG.bracket;
-        const hw = CONFIG.hardware;
-        // pipeDistance is inside-to-inside, so center-to-center = pipeDistance + diameter
-        const pipeCenterToCenter = State.pipeDistance + CONFIG.pipe.diameter;
-        const shelfOverhang = (CONFIG.shelf.width - pipeCenterToCenter) / 2;
-        const holeCenterFromBracketCenter = b.width / 2 - b.holes.left;
-        const buttonHeadRadius = hw.buttonScrew.headDiameter / 2;
-
-        return shelfOverhang - holeCenterFromBracketCenter + buttonHeadRadius + b.holeClearance;
-    },
-
     minShiftForNutClearance() {
         const hw = CONFIG.hardware;
         const pipeRadius = CONFIG.pipe.diameter / 2;
@@ -87,16 +75,20 @@ export const Layout = {
     },
 
     optimalShift() {
-        const minShiftButtonHead = this.minShiftForButtonHeadClearance();
         const minShiftNut = this.minShiftForNutClearance();
 
-        const shift = Math.max(minShiftButtonHead, minShiftNut);
+        // Apply subtract adjustment (moves brackets inward)
+        // Convert subtract value to inches, divide by 2, subtract from shift
+        const subtractInches = State.subtractUnit === 'mm'
+            ? State.subtractValue / 25.4
+            : State.subtractValue;
+        const adjustedShift = minShiftNut - (subtractInches / 2);
 
         return {
-            shift,
-            minShift: shift,
-            maxShift: shift,
-            minShiftButtonHead,
+            shift: adjustedShift,
+            minShift: adjustedShift,
+            maxShift: adjustedShift,
+            minShiftButtonHead: 0,
             minShiftNut,
             hasConflict: false
         };

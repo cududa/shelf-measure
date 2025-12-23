@@ -5,5 +5,7 @@ export const State = {
     shelfOpacity: 1.0,       // 1.0 or 0.5
     view: 'top',             // 'top', 'front', or 'template'
     nutPipeClearance: CONFIG.hardware.nutPipeClearance.target,  // Default gap in inches
-    shelfNumber: ''          // Optional shelf identifier (1, 2, a, b, etc.)
+    shelfNumber: '',         // Optional shelf identifier (1, 2, a, b, etc.)
+    subtractValue: 0,        // Tolerance adjustment value (in current unit)
+    subtractUnit: 'in'       // Unit for subtract value: 'in' or 'mm'
 };

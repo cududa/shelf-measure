@@ -47,9 +47,7 @@ export function init() {
     // Log clearance info
     const shiftInfo = Layout.optimalShift();
     console.log('Bracket shift:', Units.formatInches(shiftInfo.shift, true));
-    console.log('Min shift (button head):', Units.formatInches(shiftInfo.minShiftButtonHead, true));
     console.log('Min shift (nut clearance):', Units.formatInches(shiftInfo.minShiftNut, true));
-    console.log('Max shift (inner holes):', Units.formatInches(shiftInfo.maxShift, true));
     if (shiftInfo.hasConflict) {
         console.warn('CONFLICT: Required min shift exceeds max allowed!');
         console.warn(`Need ${Units.toMm(shiftInfo.minShift).toFixed(2)}mm, max allowed ${Units.toMm(shiftInfo.maxShift).toFixed(2)}mm`);

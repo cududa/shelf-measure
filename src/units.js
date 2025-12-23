@@ -65,5 +65,47 @@ export const Units = {
         const fraction = this.toFraction(inches);
         const mm = this.toMm(inches).toFixed(2) + 'mm';
         return `${precise} (${fraction}, ${mm})`;
+    },
+
+    /**
+     * Parse a fraction or decimal string into a numeric value
+     * Handles: "3/32", "1-3/32", "1 3/32", "0.09375"
+     * @param {string} input - The input string
+     * @returns {number} The parsed value, or NaN if invalid
+     */
+    parseFractionOrDecimal(input) {
+        if (typeof input !== 'string') {
+            return parseFloat(input) || 0;
+        }
+
+        const str = input.trim();
+        if (str === '' || str === '0') return 0;
+
+        // Try as plain decimal first
+        const decimal = parseFloat(str);
+        if (!isNaN(decimal) && !str.includes('/')) {
+            return decimal;
+        }
+
+        // Match fraction patterns: "3/32", "1-3/32", "1 3/32"
+        const mixedMatch = str.match(/^(\d+)[\s-](\d+)\/(\d+)$/);
+        if (mixedMatch) {
+            const whole = parseInt(mixedMatch[1], 10);
+            const numer = parseInt(mixedMatch[2], 10);
+            const denom = parseInt(mixedMatch[3], 10);
+            if (denom === 0) return NaN;
+            return whole + numer / denom;
+        }
+
+        // Match simple fraction: "3/32"
+        const fracMatch = str.match(/^(\d+)\/(\d+)$/);
+        if (fracMatch) {
+            const numer = parseInt(fracMatch[1], 10);
+            const denom = parseInt(fracMatch[2], 10);
+            if (denom === 0) return NaN;
+            return numer / denom;
+        }
+
+        return NaN;
     }
 };

@@ -19,8 +19,7 @@ export const CONFIG = {
             right: 9 / 25.4,
             bottom: 9 / 25.4,
             top: 9 / 25.4,
-        }, holeDiameter: 4.5 / 25.4,   // 4.5mm = 0.17717"
-        holeClearance: 1 / 16       // Keep holes this far inside/outside shelf edges
+        }, holeDiameter: 4.5 / 25.4    // 4.5mm = 0.17717"
     },
     hardware: {
         // M4-0.7 x 8mm ISO 7380 Button Head Cap Screw
@@ -36,8 +35,8 @@ export const CONFIG = {
         },
         // Clearance requirements
         nutPipeClearance: {
-            target: 0.25 / 25.4,         // Target gap: 0.25mm
-            minimum: 0.25 / 25.4         // Minimum acceptable: 0.25mm
+            target: 0,                   // Target gap: 0mm
+            minimum: 0                   // Minimum acceptable: 0mm
         }
     },
     precision: 5,
